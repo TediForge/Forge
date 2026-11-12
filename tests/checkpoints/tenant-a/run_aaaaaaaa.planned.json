@@ -1,0 +1,87 @@
+{
+  "runId": "run_aaaaaaaa",
+  "stepOutputs": {},
+  "variables": {
+    "activeIntegrations": [
+      "github"
+    ],
+    "ambient": {
+      "currentDate": "2026-11-03",
+      "currentTime": "20:09:16 UTC",
+      "dayOfWeek": "Tuesday",
+      "environment": "production",
+      "orchestrator": "Forge",
+      "timezone": "UTC"
+    },
+    "approvals": {
+      "approval_aaaaaaaaaaaaaaaa": true
+    },
+    "executionPlan": {
+      "is_sequential": true,
+      "reasoning": "Prepare then create the issue",
+      "steps": [
+        {
+          "capability": "research",
+          "depends_on": null,
+          "modality": "text",
+          "step_id": 1,
+          "task_instruction": "Prepare issue details",
+          "tool_calls": []
+        },
+        {
+          "capability": "integration",
+          "depends_on": [
+            1
+          ],
+          "modality": "text",
+          "step_id": 2,
+          "task_instruction": "Create GitHub issue",
+          "tool_calls": [
+            "github_create_issue"
+          ]
+        }
+      ]
+    },
+    "integrationCredentialRefs": {
+      "github": "github"
+    },
+    "integrationToolArguments": {
+      "github_create_issue": {
+        "owner": "tediforge",
+        "repo": "forge",
+        "title": "Engine issue"
+      }
+    },
+    "intentResult": {
+      "extracted_prompt": "Create a GitHub issue",
+      "modalities_involved": [
+        "text"
+      ],
+      "primary_capability": "integration",
+      "reasoning": "Create an external GitHub issue",
+      "requires_multistep": true,
+      "requires_tools": true
+    },
+    "originalPrompt": "Create a GitHub issue",
+    "principalRoles": [
+      "operator"
+    ],
+    "refinedPrompt": {
+      "acceptance_criteria": [
+        "The response directly satisfies the requested objective"
+      ],
+      "ambiguity_flags": [
+        "The provider returned non-structured refinement output"
+      ],
+      "constraints": [
+        "Preserve the user's original intent"
+      ],
+      "modality_profile": "general task",
+      "objective": "Create a GitHub issue",
+      "original_prompt": "Create a GitHub issue",
+      "refined_prompt": "Create a GitHub issue\n\nProvide a complete, specific result while preserving intent, stating relevant assumptions, and validating the result."
+    },
+    "tenantId": "tenant-a",
+    "userId": "user-1"
+  }
+}

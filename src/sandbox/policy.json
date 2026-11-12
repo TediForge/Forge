@@ -1,0 +1,14 @@
+{
+  "allowedRoots": ["workspace"],
+  "readOnlyRoots": ["workspace/uploads"],
+  "writeRoots": ["workspace/outputs", "workspace/tmp"],
+  "temporaryRoots": ["workspace/tmp"],
+  "maxFileSizeMb": 50,
+  "allowedExtensions": [
+    ".csv", ".db", ".sqlite", ".json", ".md", ".html", ".txt", ".pdf",
+    ".png", ".jpg", ".jpeg", ".webp", ".wav", ".mp3", ".flac", ".ogg", ".m4a", ".aac",
+    ".mp4", ".mov", ".mkv", ".avi", ".webm"
+  ],
+  "forbiddenExtensions": [".exe", ".sh", ".py", ".bat", ".cmd", ".ps1"],
+  "cleanupTmpAfterHours": 24
+}

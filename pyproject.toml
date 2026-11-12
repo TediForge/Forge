@@ -1,0 +1,17 @@
+[project]
+name = "forge"
+version = "0.1.0"
+description = "TediForge collaborative multimodal orchestration runtime"
+requires-python = ">=3.11"
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+pythonpath = [".", "tests"]
+
+[tool.pyright]
+pythonVersion = "3.11"
+typeCheckingMode = "standard"
+include = ["src", "config", "tests"]
+
+[tool.unittest]
+start-directory = "tests"

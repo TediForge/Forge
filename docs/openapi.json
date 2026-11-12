@@ -1,0 +1,1386 @@
+{
+  "openapi": "3.1.0",
+  "info": {
+    "title": "Forge Orchestrator",
+    "version": "1.0.0"
+  },
+  "paths": {
+    "/v1/responses": {
+      "post": {
+        "summary": "Create Response",
+        "operationId": "create_response_v1_responses_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/OrchestratorRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/UnifiedOrchestratorResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/chat/completions": {
+      "post": {
+        "summary": "Createchatcompletion",
+        "operationId": "createChatCompletion_v1_chat_completions_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ChatCompletionRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/models": {
+      "get": {
+        "summary": "Listmodels",
+        "operationId": "listModels_v1_models_get",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ModelListResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/models/{modelId}": {
+      "get": {
+        "summary": "Retrievemodel",
+        "operationId": "retrieveModel_v1_models__modelId__get",
+        "parameters": [
+          {
+            "name": "modelId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Modelid"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ModelResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/embeddings": {
+      "post": {
+        "summary": "Createembeddings",
+        "operationId": "createEmbeddings_v1_embeddings_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/EmbeddingsRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": true,
+                  "type": "object",
+                  "title": "Response Createembeddings V1 Embeddings Post"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/audio/transcriptions": {
+      "post": {
+        "summary": "Transcribe Audio",
+        "operationId": "transcribe_audio_v1_audio_transcriptions_post",
+        "requestBody": {
+          "content": {
+            "multipart/form-data": {
+              "schema": {
+                "$ref": "#/components/schemas/Body_transcribe_audio_v1_audio_transcriptions_post"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/audio/speech": {
+      "post": {
+        "summary": "Speech",
+        "operationId": "speech_v1_audio_speech_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SpeechRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+  },
+  "components": {
+    "schemas": {
+      "ActionRecord": {
+        "properties": {
+          "type": {
+            "type": "string",
+            "const": "action",
+            "title": "Type",
+            "default": "action"
+          },
+          "actionId": {
+            "type": "string",
+            "pattern": "^A[A-Z0-9]{5}$",
+            "title": "Actionid"
+          },
+          "actionType": {
+            "type": "string",
+            "enum": [
+              "tool",
+              "integration",
+              "data",
+              "attachment"
+            ],
+            "title": "Actiontype"
+          },
+          "toolName": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Toolname"
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "started",
+              "processing",
+              "completed",
+              "failed"
+            ],
+            "title": "Status"
+          },
+          "message": {
+            "type": "string",
+            "minLength": 1,
+            "title": "Message"
+          },
+          "startedAt": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Startedat"
+          },
+          "endedAt": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Endedat"
+          },
+          "metadata": {
+            "additionalProperties": true,
+            "type": "object",
+            "title": "Metadata"
+          },
+          "error": {
+            "anyOf": [
+              {
+                "additionalProperties": {
+                  "type": "string"
+                },
+                "type": "object"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Error"
+          }
+        },
+        "type": "object",
+        "required": [
+          "actionId",
+          "actionType",
+          "status",
+          "message"
+        ],
+        "title": "ActionRecord"
+      },
+      "AttachmentPayload": {
+        "properties": {
+          "fileId": {
+            "type": "string",
+            "maxLength": 200,
+            "minLength": 1,
+            "title": "Fileid",
+            "description": "Stable file identifier"
+          },
+          "fileName": {
+            "type": "string",
+            "maxLength": 255,
+            "minLength": 1,
+            "title": "Filename",
+            "description": "Original file name"
+          },
+          "mimeType": {
+            "type": "string",
+            "maxLength": 255,
+            "minLength": 1,
+            "title": "Mimetype",
+            "description": "Declared media type verified before use"
+          },
+          "fileData": {
+            "type": "string",
+            "minLength": 1,
+            "title": "Filedata",
+            "description": "Base64-encoded file bytes"
+          },
+          "attachmentType": {
+            "$ref": "#/components/schemas/AttachmentType",
+            "default": "unknown"
+          },
+          "fileSizeBytes": {
+            "anyOf": [
+              {
+                "type": "integer",
+                "minimum": 0.0
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Filesizebytes"
+          },
+          "checksumSha256": {
+            "anyOf": [
+              {
+                "type": "string",
+                "pattern": "^[a-fA-F0-9]{64}$"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Checksumsha256"
+          },
+          "metadata": {
+            "additionalProperties": true,
+            "type": "object",
+            "title": "Metadata",
+            "description": "Non-secret file metadata"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "fileId",
+          "fileName",
+          "mimeType",
+          "fileData"
+        ],
+        "title": "AttachmentPayload"
+      },
+      "AttachmentType": {
+        "type": "string",
+        "enum": [
+          "image",
+          "document",
+          "audio",
+          "video",
+          "code",
+          "unknown"
+        ],
+        "title": "AttachmentType"
+      },
+      "Body_transcribe_audio_v1_audio_transcriptions_post": {
+        "properties": {
+          "file": {
+            "type": "string",
+            "contentMediaType": "application/octet-stream",
+            "title": "File"
+          },
+          "language": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Language"
+          },
+          "timestamps": {
+            "type": "boolean",
+            "title": "Timestamps",
+            "default": false
+          },
+          "model": {
+            "type": "string",
+            "title": "Model",
+            "default": "transcription"
+          },
+          "response_format": {
+            "type": "string",
+            "enum": [
+              "json",
+              "text",
+              "verbose_json"
+            ],
+            "title": "Response Format",
+            "default": "json"
+          }
+        },
+        "type": "object",
+        "required": [
+          "file"
+        ],
+        "title": "Body_transcribe_audio_v1_audio_transcriptions_post"
+      },
+      "ChatCompletionRequest": {
+        "properties": {
+          "model": {
+            "type": "string",
+            "title": "Model",
+            "default": "text"
+          },
+          "messages": {
+            "items": {
+              "$ref": "#/components/schemas/ChatMessage"
+            },
+            "type": "array",
+            "maxItems": 100,
+            "minItems": 1,
+            "title": "Messages"
+          },
+          "stream": {
+            "type": "boolean",
+            "title": "Stream",
+            "default": false
+          },
+          "max_tokens": {
+            "anyOf": [
+              {
+                "type": "integer",
+                "minimum": 1.0
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Max Tokens"
+          },
+          "temperature": {
+            "anyOf": [
+              {
+                "type": "number",
+                "maximum": 2.0,
+                "minimum": 0.0
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Temperature"
+          },
+          "top_p": {
+            "anyOf": [
+              {
+                "type": "number",
+                "maximum": 1.0,
+                "minimum": 0.0
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Top P"
+          },
+          "stop": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "items": {
+                  "type": "string"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Stop"
+          },
+          "n": {
+            "type": "integer",
+            "maximum": 1.0,
+            "minimum": 1.0,
+            "title": "N",
+            "default": 1
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "messages"
+        ],
+        "title": "ChatCompletionRequest"
+      },
+      "ChatMessage": {
+        "properties": {
+          "role": {
+            "type": "string",
+            "enum": [
+              "system",
+              "developer",
+              "user",
+              "assistant"
+            ],
+            "title": "Role"
+          },
+          "content": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "items": {
+                  "additionalProperties": true,
+                  "type": "object"
+                },
+                "type": "array"
+              }
+            ],
+            "title": "Content"
+          },
+          "name": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Name"
+          }
+        },
+        "type": "object",
+        "required": [
+          "role",
+          "content"
+        ],
+        "title": "ChatMessage"
+      },
+      "ContentBlock": {
+        "properties": {
+          "type": {
+            "type": "string",
+            "enum": [
+              "text",
+              "image",
+              "video",
+              "audio",
+              "file"
+            ],
+            "title": "Type"
+          },
+          "text": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Text"
+          },
+          "assetId": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Assetid"
+          },
+          "mediaData": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Mediadata",
+            "description": "Base64-encoded bytes for non-text blocks"
+          },
+          "mimeType": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Mimetype"
+          },
+          "fileName": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Filename"
+          },
+          "fileSizeBytes": {
+            "anyOf": [
+              {
+                "type": "integer",
+                "minimum": 0.0
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Filesizebytes"
+          },
+          "altText": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Alttext"
+          },
+          "metadata": {
+            "additionalProperties": true,
+            "type": "object",
+            "title": "Metadata"
+          }
+        },
+        "type": "object",
+        "required": [
+          "type"
+        ],
+        "title": "ContentBlock",
+        "description": "Ordered text or base64-inline media content."
+      },
+      "EmbeddingsRequest": {
+        "properties": {
+          "model": {
+            "type": "string",
+            "title": "Model",
+            "default": "embedding"
+          },
+          "input": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "items": {
+                  "type": "string"
+                },
+                "type": "array"
+              }
+            ],
+            "minLength": 1,
+            "title": "Input"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "input"
+        ],
+        "title": "EmbeddingsRequest"
+      },
+      "ExternalToolDefinition": {
+        "properties": {
+          "type": {
+            "type": "string",
+            "const": "function",
+            "title": "Type",
+            "default": "function"
+          },
+          "name": {
+            "type": "string",
+            "maxLength": 128,
+            "minLength": 1,
+            "pattern": "^[a-z][a-z0-9]*$",
+            "title": "Name"
+          },
+          "description": {
+            "type": "string",
+            "maxLength": 4000,
+            "title": "Description"
+          },
+          "parameters": {
+            "additionalProperties": true,
+            "type": "object",
+            "title": "Parameters"
+          },
+          "strict": {
+            "type": "boolean",
+            "title": "Strict",
+            "default": true
+          }
+        },
+        "type": "object",
+        "required": [
+          "name",
+          "description"
+        ],
+        "title": "ExternalToolDefinition"
+      },
+      "FunctionCall": {
+        "properties": {
+          "type": {
+            "type": "string",
+            "const": "function_call",
+            "title": "Type",
+            "default": "function_call"
+          },
+          "call_id": {
+            "type": "string",
+            "title": "Call Id"
+          },
+          "name": {
+            "type": "string",
+            "title": "Name"
+          },
+          "arguments": {
+            "type": "string",
+            "title": "Arguments"
+          }
+        },
+        "type": "object",
+        "required": [
+          "call_id",
+          "name",
+          "arguments"
+        ],
+        "title": "FunctionCall"
+      },
+      "FunctionCallOutput": {
+        "properties": {
+          "type": {
+            "type": "string",
+            "const": "function_call_output",
+            "title": "Type",
+            "default": "function_call_output"
+          },
+          "call_id": {
+            "type": "string",
+            "maxLength": 80,
+            "minLength": 6,
+            "title": "Call Id"
+          },
+          "output": {
+            "title": "Output"
+          }
+        },
+        "type": "object",
+        "required": [
+          "call_id",
+          "output"
+        ],
+        "title": "FunctionCallOutput"
+      },
+      "HTTPValidationError": {
+        "properties": {
+          "detail": {
+            "items": {
+              "$ref": "#/components/schemas/ValidationError"
+            },
+            "type": "array",
+            "title": "Detail"
+          }
+        },
+        "type": "object",
+        "title": "HTTPValidationError"
+      },
+      "Message": {
+        "properties": {
+          "role": {
+            "type": "string",
+            "enum": [
+              "system",
+              "user",
+              "assistant"
+            ],
+            "title": "Role"
+          },
+          "content": {
+            "type": "string",
+            "maxLength": 8000,
+            "title": "Content"
+          },
+          "attachments": {
+            "items": {
+              "$ref": "#/components/schemas/AttachmentPayload"
+            },
+            "type": "array",
+            "maxItems": 20,
+            "title": "Attachments"
+          },
+          "messageId": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Messageid"
+          },
+          "createdAt": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Createdat"
+          }
+        },
+        "type": "object",
+        "required": [
+          "role",
+          "content"
+        ],
+        "title": "Message",
+        "description": "A conversation turn; its attachments belong to this message."
+      },
+      "ModelListResponse": {
+        "properties": {
+          "object": {
+            "type": "string",
+            "const": "list",
+            "title": "Object"
+          },
+          "data": {
+            "items": {
+              "$ref": "#/components/schemas/ModelResponse"
+            },
+            "type": "array",
+            "title": "Data"
+          }
+        },
+        "type": "object",
+        "required": [
+          "object",
+          "data"
+        ],
+        "title": "ModelListResponse"
+      },
+      "ModelResponse": {
+        "properties": {
+          "id": {
+            "type": "string",
+            "title": "Id"
+          },
+          "object": {
+            "type": "string",
+            "const": "model",
+            "title": "Object"
+          },
+          "created": {
+            "type": "integer",
+            "title": "Created"
+          },
+          "owned_by": {
+            "type": "string",
+            "title": "Owned By"
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "object",
+          "created",
+          "owned_by"
+        ],
+        "title": "ModelResponse"
+      },
+      "OrchestratorRequest": {
+        "properties": {
+          "messages": {
+            "items": {
+              "anyOf": [
+                {
+                  "$ref": "#/components/schemas/Message"
+                },
+                {
+                  "$ref": "#/components/schemas/FunctionCallOutput"
+                }
+              ]
+            },
+            "type": "array",
+            "title": "Messages"
+          },
+          "stream": {
+            "type": "boolean",
+            "title": "Stream",
+            "default": false
+          },
+          "reasoning": {
+            "$ref": "#/components/schemas/ReasoningConfig"
+          },
+          "tools": {
+            "items": {
+              "$ref": "#/components/schemas/ExternalToolDefinition"
+            },
+            "type": "array",
+            "title": "Tools"
+          },
+          "previous_response_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Previous Response Id"
+          },
+          "metadata": {
+            "additionalProperties": true,
+            "type": "object",
+            "title": "Metadata"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "title": "OrchestratorRequest",
+        "description": "The master input payload schema received by the Forge orchestrator."
+      },
+      "ReasoningConfig": {
+        "properties": {
+          "effort": {
+            "type": "string",
+            "enum": [
+              "low",
+              "medium",
+              "high",
+              "xhigh"
+            ],
+            "title": "Effort",
+            "default": "medium"
+          }
+        },
+        "type": "object",
+        "title": "ReasoningConfig"
+      },
+      "RunStatus": {
+        "properties": {
+          "type": {
+            "type": "string",
+            "const": "status",
+            "title": "Type",
+            "default": "status"
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "started",
+              "planned",
+              "completed",
+              "failed",
+              "cancelled",
+              "requires_action"
+            ],
+            "title": "Status"
+          },
+          "terminationReason": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Terminationreason"
+          },
+          "startedAt": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Startedat"
+          },
+          "endedAt": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Endedat"
+          },
+          "stepCount": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Stepcount"
+          },
+          "toolCallCount": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Toolcallcount"
+          }
+        },
+        "type": "object",
+        "required": [
+          "status"
+        ],
+        "title": "RunStatus"
+      },
+      "SourceReference": {
+        "properties": {
+          "title": {
+            "type": "string",
+            "title": "Title"
+          },
+          "url": {
+            "type": "string",
+            "title": "Url"
+          },
+          "snippet": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Snippet"
+          },
+          "sourceType": {
+            "type": "string",
+            "enum": [
+              "web",
+              "document",
+              "integration",
+              "other"
+            ],
+            "title": "Sourcetype",
+            "default": "other"
+          },
+          "metadata": {
+            "additionalProperties": true,
+            "type": "object",
+            "title": "Metadata"
+          }
+        },
+        "type": "object",
+        "required": [
+          "title",
+          "url"
+        ],
+        "title": "SourceReference"
+      },
+      "SpeechRequest": {
+        "properties": {
+          "input": {
+            "type": "string",
+            "maxLength": 4096,
+            "minLength": 1,
+            "title": "Input"
+          },
+          "model": {
+            "type": "string",
+            "const": "forge-tts",
+            "title": "Model",
+            "default": "forge-tts"
+          },
+          "voice": {
+            "type": "string",
+            "const": "default",
+            "title": "Voice",
+            "default": "default"
+          },
+          "response_format": {
+            "type": "string",
+            "enum": [
+              "wav",
+              "pcm"
+            ],
+            "title": "Response Format",
+            "default": "wav"
+          },
+          "speed": {
+            "type": "number",
+            "maximum": 4.0,
+            "minimum": 0.25,
+            "title": "Speed",
+            "default": 1.0
+          },
+          "instructions": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Instructions"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "input"
+        ],
+        "title": "SpeechRequest"
+      },
+      "Thought": {
+        "properties": {
+          "id": {
+            "type": "string",
+            "pattern": "^T[A-Z0-9]{5}$",
+            "title": "Id"
+          },
+          "type": {
+            "type": "string",
+            "const": "thought",
+            "title": "Type",
+            "default": "thought"
+          },
+          "message": {
+            "type": "string",
+            "minLength": 1,
+            "title": "Message"
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "started",
+              "processing",
+              "completed"
+            ],
+            "title": "Status",
+            "default": "processing"
+          },
+          "data": {
+            "additionalProperties": true,
+            "type": "object",
+            "title": "Data"
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "message"
+        ],
+        "title": "Thought"
+      },
+      "UnifiedOrchestratorResponse": {
+        "properties": {
+          "runId": {
+            "type": "string",
+            "title": "Runid",
+            "description": "Unique execution run identifier"
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "completed",
+              "requires_action",
+              "failed"
+            ],
+            "title": "Status",
+            "default": "completed"
+          },
+          "functionCalls": {
+            "anyOf": [
+              {
+                "items": {
+                  "$ref": "#/components/schemas/FunctionCall"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Functioncalls"
+          },
+          "events": {
+            "items": {
+              "oneOf": [
+                {
+                  "$ref": "#/components/schemas/Thought"
+                },
+                {
+                  "$ref": "#/components/schemas/ActionRecord"
+                },
+                {
+                  "$ref": "#/components/schemas/RunStatus"
+                }
+              ],
+              "discriminator": {
+                "propertyName": "type",
+                "mapping": {
+                  "action": "#/components/schemas/ActionRecord",
+                  "status": "#/components/schemas/RunStatus",
+                  "thought": "#/components/schemas/Thought"
+                }
+              }
+            },
+            "type": "array",
+            "title": "Events"
+          },
+          "content": {
+            "items": {
+              "$ref": "#/components/schemas/ContentBlock"
+            },
+            "type": "array",
+            "title": "Content"
+          },
+          "sources": {
+            "items": {
+              "$ref": "#/components/schemas/SourceReference"
+            },
+            "type": "array",
+            "title": "Sources"
+          },
+          "metadata": {
+            "additionalProperties": true,
+            "type": "object",
+            "title": "Metadata"
+          }
+        },
+        "type": "object",
+        "required": [
+          "runId"
+        ],
+        "title": "UnifiedOrchestratorResponse"
+      },
+      "ValidationError": {
+        "properties": {
+          "loc": {
+            "items": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "integer"
+                }
+              ]
+            },
+            "type": "array",
+            "title": "Location"
+          },
+          "msg": {
+            "type": "string",
+            "title": "Message"
+          },
+          "type": {
+            "type": "string",
+            "title": "Error Type"
+          },
+          "input": {
+            "title": "Input"
+          },
+          "ctx": {
+            "type": "object",
+            "title": "Context"
+          }
+        },
+        "type": "object",
+        "required": [
+          "loc",
+          "msg",
+          "type"
+        ],
+        "title": "ValidationError"
+      }
+    }
+  }
+}

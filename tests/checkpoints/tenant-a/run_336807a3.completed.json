@@ -1,0 +1,69 @@
+{
+  "runId": "run_336807a3",
+  "stepOutputs": {
+    "1": "answer"
+  },
+  "variables": {
+    "activeIntegrations": [],
+    "ambient": {
+      "currentDate": "2026-11-03",
+      "currentTime": "18:30:43 UTC",
+      "dayOfWeek": "Tuesday",
+      "environment": "production",
+      "orchestrator": "Forge",
+      "timezone": "UTC"
+    },
+    "approvals": {},
+    "executionOutputHistory": [
+      "answer"
+    ],
+    "executionPlan": {
+      "is_sequential": false,
+      "reasoning": "Direct single-step execution path.",
+      "steps": [
+        {
+          "capability": "chat",
+          "depends_on": null,
+          "modality": "text",
+          "step_id": 1,
+          "task_instruction": "build api\n\nProvide a complete, specific result. Preserve the user's intent, state relevant assumptions, satisfy explicit constraints, validate the result, and prioritize factual accuracy and actionable detail.",
+          "tool_calls": null
+        }
+      ]
+    },
+    "integrationCredentialRefs": {},
+    "integrationToolArguments": {},
+    "intentResult": {
+      "extracted_prompt": "hello",
+      "modalities_involved": [
+        "text"
+      ],
+      "primary_capability": "chat",
+      "reasoning": "Direct text request",
+      "requires_multistep": false,
+      "requires_tools": false
+    },
+    "originalPrompt": "build api",
+    "principalRoles": [
+      "operator"
+    ],
+    "refinedPrompt": {
+      "acceptance_criteria": [
+        "The response directly satisfies the requested objective"
+      ],
+      "ambiguity_flags": [
+        "The provider returned non-structured refinement output"
+      ],
+      "constraints": [
+        "Preserve the user's original intent",
+        "Do not invent unavailable facts"
+      ],
+      "modality_profile": "general task",
+      "objective": "build api",
+      "original_prompt": "build api",
+      "refined_prompt": "build api\n\nProvide a complete, specific result. Preserve the user's intent, state relevant assumptions, satisfy explicit constraints, validate the result, and prioritize factual accuracy and actionable detail."
+    },
+    "tenantId": "tenant-a",
+    "userId": "user-1"
+  }
+}

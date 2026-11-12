@@ -1,0 +1,42 @@
+[
+  {
+    "id": "direct-chat",
+    "intent": {
+      "reasoning": "General text question",
+      "modalities_involved": ["text"],
+      "primary_capability": "chat",
+      "requires_multistep": false,
+      "requires_tools": false,
+      "extracted_prompt": "Explain caching"
+    },
+    "min_steps": 1,
+    "max_steps": 1
+  },
+  {
+    "id": "code-agent-direct",
+    "intent": {
+      "reasoning": "Delegate implementation to the coding agent",
+      "modalities_involved": ["text"],
+      "primary_capability": "coding",
+      "requires_multistep": false,
+      "requires_tools": false,
+      "extracted_prompt": "Create and test a Python script"
+    },
+    "min_steps": 1,
+    "max_steps": 1
+  },
+  {
+    "id": "github-integration",
+    "intent": {
+      "reasoning": "External repository action required",
+      "modalities_involved": ["text"],
+      "primary_capability": "integration",
+      "requires_multistep": false,
+      "requires_tools": true,
+      "extracted_prompt": "Create a GitHub issue from this report"
+    },
+    "required_dependency": [1, 2],
+    "min_steps": 2,
+    "max_steps": 2
+  }
+]

@@ -1,0 +1,65 @@
+{
+  "runId": "run_97e215ce",
+  "stepOutputs": {
+    "1": "answer"
+  },
+  "variables": {
+    "ambient": {
+      "currentDate": "2026-11-04",
+      "currentTime": "16:57:22 UTC",
+      "dayOfWeek": "Wednesday",
+      "environment": "production",
+      "orchestrator": "Forge",
+      "timezone": "UTC"
+    },
+    "executionOutputHistory": [
+      "answer"
+    ],
+    "executionPlan": {
+      "is_sequential": false,
+      "reasoning": "Direct single-step execution path.",
+      "steps": [
+        {
+          "capability": "chat",
+          "depends_on": null,
+          "modality": "text",
+          "step_id": 1,
+          "task_instruction": "build api\n\nProvide a complete, specific result while preserving intent, stating relevant assumptions, and validating the result.",
+          "tool_calls": null
+        }
+      ]
+    },
+    "intentResult": {
+      "extracted_prompt": "hello",
+      "modalities_involved": [
+        "text"
+      ],
+      "primary_capability": "chat",
+      "reasoning": "Direct text request",
+      "requires_multistep": false,
+      "requires_tools": false
+    },
+    "originalPrompt": "build api",
+    "principalRoles": [
+      "operator"
+    ],
+    "refinedPrompt": {
+      "acceptance_criteria": [
+        "The response directly satisfies the requested objective"
+      ],
+      "ambiguity_flags": [
+        "The provider returned non-structured refinement output"
+      ],
+      "constraints": [
+        "Preserve the user's original intent"
+      ],
+      "modality_profile": "general task",
+      "objective": "build api",
+      "original_prompt": "build api",
+      "refined_prompt": "build api\n\nProvide a complete, specific result while preserving intent, stating relevant assumptions, and validating the result."
+    },
+    "tenantId": "tenant-a",
+    "toolArguments": {},
+    "userId": "user-1"
+  }
+}
