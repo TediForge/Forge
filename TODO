@@ -2,103 +2,16 @@
 
 ## Critical
 
-- [ ] Replace client-controlled identity headers with verified, signed identity claims from the trusted TediGPT backend.
-- [ ] Stop assigning the operator role by default; derive roles and attributes from the verified identity provider.
-- [ ] Authorize approval reads, approvals, and denials against the authenticated user, tenant, and approval permission.
-- [ ] Do not treat client-supplied approval booleans as trusted approval; require an authenticated approval decision bound to the action and principal.
-- [ ] Scope integration clients and credentials to a single run and user so the process-global registry cannot reuse another user's plugin instance.
-- [ ] Prevent orchestration exceptions from leaving idempotency records permanently in progress; define retry and conflict behavior for concurrent requests.
+- [ ] Prevent orchestration exceptions from leaving idempotency records permanently in progress, define retry and conflict behavior for concurrent requests.
 
 ## Orchestration and Execution
 
-- [x] Add structured intent classification, prompt refinement, and execution planning with deterministic fallbacks.
-- [x] Add execution-plan dependency ordering, step limits, iteration limits, runtime limits, token estimates, and repeated-action circuit breaking.
-- [x] Add execution evaluation for repeated outputs and terminal response statuses.
-- [ ] Run PlanReviewer before executing a plan and reject or safely repair invalid plans; update its supported modalities to match the actual runtime.
-- [ ] Execute registered built-in tools from planned tool calls, validate their arguments, include results in dependent steps, and account for tool calls in the execution budget.
-- [ ] Make static and streaming runs follow the same dependency, timeout, integration, evaluator, checkpoint, audit, and terminal-status behavior.
-- [ ] Feed prior step outputs and authorized conversation history into streaming steps as well as static steps.
-- [ ] Persist and load session history; currently request history is held in a local SessionManager and is not supplied to agents or retained between requests.
-- [ ] Apply request mode, forcedModality, and supported metadata options; these are accepted by the schema but ignored by the engine.
-- [ ] Include trusted ambient context and refined prompt in the actual agent/dispatcher prompt without exposing unrelated state.
-- [ ] Make classifier, refiner, and planner support async provider adapters or explicitly constrain and validate the provider interface.
-- [ ] Handle cancellation, provider failures, and execution-limit exceptions consistently, and always emit a terminal stream event with final status and metrics.
+
 
 ## Agents and Attachments
 
 - [x] Register specialist agents for coding, research, documents, vision, media, data, evaluation, and integrations.
-- [x] Add structured agent messages, handoff records, task status, and a shared per-run scratchpad.
-- [ ] Implement coordinator-driven handoff delivery, acceptance, and follow-up; agents currently record messages but the registry does not route them to recipients.
-- [ ] Pass attachment bytes or trusted storage references into the selected specialist; current attachment handling only records a routing decision.
-- [ ] Add actual document parsing, OCR, transcription, image/video perception, and data-processing paths for attachments instead of relying on the text dispatcher alone.
-- [ ] Validate attachment content, decoded size, MIME type against file signatures, file names, and storage access before processing.
-- [ ] Add and register working document, data, video, and embedding dispatchers; default engine dispatchers currently cover only text, image, and audio.
 
 ## Tools and Models
 
 - [x] Register built-in tool schemas and handlers through a shared tool registry and executor.
-- [x] Implement calculator, clock, CSV, basic image inspection/OCR/resize, media probing/frame extraction, and basic CSV data-analysis utilities.
-- [ ] Connect ToolExecutor to the agent/model tool-call loop and enforce per-run tool budgets, permissions, and result redaction.
-- [ ] Restrict file tools to approved workspace/storage roots, enforce file and output size limits, and add subprocess timeouts for ffmpeg/ffprobe operations.
-- [ ] Replace raw web-search HTML with parsed, bounded results and validated source references; handle provider blocking and network errors safely.
-- [ ] Make SQL connections genuinely read-only with a SQLite authorizer or read-only connection and enforce query, result, and execution-time limits.
-- [ ] Implement provider-backed image generation, object detection, video generation/composition, asset rendering, and audio transcription, or narrow the advertised capabilities until available.
-- [ ] Load and validate the core model registry at startup and use its capability, parameter, tool, and streaming declarations for routing.
-- [ ] Add production provider factories and secret-backed configuration; the default API engine currently has no configured text provider and marks readiness degraded.
-
-## Integrations
-
-- [x] Add initial API clients and tool schemas for GitHub, Slack, Canva, Hevy, Tripsy, Linear, Notion, Google Calendar, and Gmail.
-- [x] Add user-scoped credential-reference interfaces and an explicit environment-backed development token store.
-- [x] Bind external write approvals to tenant, user, run, plugin, action, and canonicalized arguments in ApprovalStore.
-- [ ] Implement the production credential-vault adapter and inject it into the API engine; the default API currently has no token store.
-- [ ] Enforce declared OAuth scopes and user authorization before exposing or executing plugin tools.
-- [ ] Enforce EgressPolicy on every outbound provider request, including scheme and host validation; the policy helper is not connected to plugin clients.
-- [ ] Complete and contract-test connector operations promised by README, including the missing GitHub repository/code workflows, Linear projects/cycles, and Gmail sending if those remain supported requirements.
-- [ ] Standardize provider timeouts, retries, rate-limit handling, safe error responses, and reauthorization behavior across all plugins.
-- [ ] Validate connector API payloads and endpoint behavior against provider documentation and mocked contract tests before enabling live credentials.
-- [ ] Close per-run plugin clients reliably and prevent credentials or provider error details from entering prompts, traces, and API responses.
-
-## Security and Durability
-
-- [x] Add RBAC and ABAC authorization primitives, policy decisions, action-bound approval storage, audit redaction, and tenant-namespaced checkpoints.
-- [x] Add request idempotency keyed by tenant, user, client key, and request fingerprint, with completed-response replay.
-- [ ] Apply RBAC, ABAC, and approval permissions to every API route and integration action; existing helpers are not consistently enforced.
-- [ ] Replace process-local idempotency and approval stores with durable atomic storage for multi-worker deployments.
-- [ ] Persist idempotency outcomes for failures and streams, expire records consistently, and safely handle duplicate requests that arrive while the first request is running.
-- [ ] Add checkpoint resume/recovery and make checkpoint writes atomic, access-controlled, and safe against tenant/path traversal.
-- [ ] Add audit/checkpoint retention, rotation, access controls, and production storage configuration.
-- [ ] Sanitize provider and orchestration exceptions before returning them; the API currently exposes exception text and remaps errors to HTTP 502.
-- [ ] Add outbound request rate limits, payload limits, and secret-safe structured operational logs.
-
-## API and Contracts
-
-- [x] Add health, readiness, approval, and orchestration endpoints with Pydantic request/response models.
-- [x] Add camelCase aliases, static response synthesis, SSE event sequencing, and an OpenAPI generation script.
-- [ ] Preserve intentional HTTP errors such as 401, 403, 409, and 422 instead of wrapping all endpoint exceptions as 502.
-- [ ] Add API authentication and authorization requirements to OpenAPI, including approval ownership and tenant boundaries.
-- [ ] Add prompt, history, attachment, and request-size limits; enforce role/content validation for conversation history.
-- [ ] Define stable sanitized error response models and ensure static and streaming response contracts document terminal statuses.
-- [ ] Verify generated docs/openapi.json against the live application after API contract changes.
-
-## Testing
-
-- [x] Add unit tests for planning, agent routing, attachment classification, budgets, evaluation, approvals, redaction, checkpoints, synthesis, SQL write rejection, and tool registration.
-- [x] Add deterministic golden planning tasks for direct chat, tool-aware work, and GitHub approval flows.
-- [ ] Add API tests for identity validation, role enforcement, approval ownership, error status preservation, idempotency conflicts/replays, and streaming responses.
-- [ ] Add tests proving cross-user and cross-tenant integration credentials and plugin clients cannot be reused.
-- [ ] Add tool invocation tests through the full engine path, including budget exhaustion, invalid arguments, file sandboxing, and provider failures.
-- [ ] Add parity tests for static versus streaming execution, dependency context, terminal outcomes, audit, and checkpoints.
-- [ ] Add attachment content/security tests and provider-mocked contract tests for every advertised integration and modality.
-- [ ] Add concurrency and failure tests for in-progress idempotency, approval persistence, checkpoint recovery, and multi-worker behavior.
-- [ ] Add CI checks for unit tests, type checking, compile checks, golden evaluations, and OpenAPI drift.
-
-## Operations and Production Readiness
-
-- [x] Add a Python 3.11 Docker image with ffmpeg, ffprobe, and Tesseract dependencies.
-- [x] Add a file-backed audit log, tenant-scoped checkpoint store, OpenAPI generator, and deterministic evaluation runner.
-- [ ] Add environment-driven production configuration for model providers, credential vaults, allowed origins/hosts, limits, and storage backends.
-- [ ] Expand readiness checks to cover configured providers, required system tools, durable storage, and credential-vault availability.
-- [ ] Add metrics and monitoring for request volume, provider latency/errors, tool use, budget termination, and approval outcomes.
-- [ ] Document deployment secrets, provider setup, trusted identity headers/assertions, storage, migrations, retention, and incident recovery.
-- [ ] Run provider-mocked integration tests and security checks before enabling production credentials; separately verify live provider contracts and recovery procedures.

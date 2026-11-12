@@ -3,16 +3,16 @@ import json
 import sys
 from types import SimpleNamespace
 
-from src.tools.definitions.audio import TOOLS as audioTools
-from src.tools.definitions.audio import audio
-from src.tools.definitions.calculator import TOOLS as calculatorTools
-from src.tools.definitions.calculator import calculate
-from src.tools.definitions.clock import TOOLS as clockTools
-from src.tools.definitions.clock import clock
-from src.tools.definitions.image import generate as generateImage
-from src.tools.definitions.search import search
-from src.tools.definitions.spreadsheet import TOOLS as csvTools
-from src.tools.definitions.spreadsheet import read, write
+from orchestrator.tools.definitions.audio import TOOLS as audioTools
+from orchestrator.tools.definitions.audio import audio
+from orchestrator.tools.definitions.calculator import TOOLS as calculatorTools
+from orchestrator.tools.definitions.calculator import calculate
+from orchestrator.tools.definitions.clock import TOOLS as clockTools
+from orchestrator.tools.definitions.clock import clock
+from orchestrator.tools.definitions.image import generate as generateImage
+from orchestrator.tools.definitions.search import search
+from orchestrator.tools.definitions.spreadsheet import TOOLS as csvTools
+from orchestrator.tools.definitions.spreadsheet import read, write
 
 
 def test_calculator_returns_structured_numeric_result():
@@ -56,7 +56,7 @@ def test_search_returns_structured_results_and_bounded_page_evidence(monkeypatch
 			return {"content": "Page evidence"}
 
 	monkeypatch.setitem(sys.modules, "ddgs", SimpleNamespace(DDGS=FakeDDGS))
-	monkeypatch.setattr("src.tools.definitions.search._isPublicHttpsUrl", lambda _: True)
+	monkeypatch.setattr("orchestrator.tools.definitions.search._isPublicHttpsUrl", lambda _: True)
 
 	result = search("web", query="public data", maxResults=5, extractResults=9)
 
@@ -139,9 +139,9 @@ def test_probe_audio_returns_trimmed_metadata_and_structured_errors(sandboxWorks
 			{"codec_type": "video", "codec_name": "mjpeg"},
 		],
 	}
-	monkeypatch.setattr("src.tools.definitions.audio.shutil.which", lambda _: "ffprobe")
+	monkeypatch.setattr("orchestrator.tools.definitions.audio.shutil.which", lambda _: "ffprobe")
 	monkeypatch.setattr(
-		"src.tools.definitions.audio.subprocess.run",
+		"orchestrator.tools.definitions.audio.subprocess.run",
 		lambda *args, **kwargs: SimpleNamespace(returncode=0, stdout=json.dumps(metadata), stderr=""),
 	)
 

@@ -23,17 +23,17 @@ wire compatibility only. They are not instructions to call OpenAI.
 
 The Piper integration advertises only its registry-selected default voice and
 WAV or raw PCM output. The faster-whisper integration uses the `transcription`
-registry key. Speech model repositories, CPU devices, cache, and compute type
-are source-controlled defaults; replacing a repository in the model registry
+registry key. Speech artifact locators, CPU devices, cache, and compute type
+are source-controlled defaults; replacing a locator or source configuration
 is the intended way to adopt a Forge-trained model. No `FORGE_OPENAI_*`
 variables or external speech service credentials are used.
 
 ## Consequences
 
 - The `audio` and `transcription` entries in
-  `src/core/models/registry.py` select the local model repositories.
+  `src/orchestrator/inference/registry.py` select default artifact locators.
 - Runtime cache, device, and compute settings are constants in
-  `src/core/models/huggingface.py`.
+  `src/orchestrator/inference/backends/local.py`.
 - `/v1/audio/transcriptions`, `/v1/audio/speech`, and `/v1/audio/sts` reuse
   the same local tool handlers and injected dispatchers.
 - Unsupported Piper output formats or speech instructions are rejected

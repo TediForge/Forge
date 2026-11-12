@@ -1,7 +1,7 @@
 # Skills
 
-Skill files live under `src/skills/`. This keeps them within the orchestrator
-package and lets the loader resolve them relative to `src/skills/loader.py`.
+Skill files live under `src/orchestrator/skills/`. This keeps them within the orchestrator
+package and lets the loader resolve them relative to `src/orchestrator/skills/loader.py`.
 Every file is named `SKILL.md` and begins with YAML frontmatter containing
 `name`, `description`, and `category`.
 
@@ -9,9 +9,9 @@ Every file is named `SKILL.md` and begins with YAML frontmatter containing
 
 | Category | Location | Purpose |
 |---|---|---|
-| Tool | `src/skills/tools/<name>/SKILL.md` | How and when to call one registered local tool |
-| Agent | `src/skills/agents/<name>/SKILL.md` | How one specialist agent performs its job |
-| General | `src/skills/general/<name>/SKILL.md` | Classifier, planner, refiner, evaluation, and other engine guidance |
+| Tool | `src/orchestrator/skills/tools/<name>/SKILL.md` | How and when to call one registered local tool |
+| Agent | `src/orchestrator/skills/agents/<name>/SKILL.md` | How one specialist agent performs its job |
+| General | `src/orchestrator/skills/general/<name>/SKILL.md` | Classifier, planner, refiner, evaluation, and other engine guidance |
 
 Directory names are lowercase one-word identifiers. Agent prompts are loaded
 lazily through `BaseAgent.system_prompt`; tool skills are checked when the
@@ -77,7 +77,7 @@ do not fabricate query terms.
 ```
 
 The reference implementation for prompt refinement is
-`src/skills/general/refiner/SKILL.md`. Skills are executable behavior
+`src/orchestrator/skills/general/refiner/SKILL.md`. Skills are executable behavior
 specifications and should be reviewed as code.
 
 ## Promotion rule

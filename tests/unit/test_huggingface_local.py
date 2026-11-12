@@ -1,11 +1,12 @@
 import asyncio
+import queue
 import sys
 from contextlib import nullcontext
 from types import SimpleNamespace
 
-from src.core.models import huggingface
-from src.core.models.huggingface import HuggingFaceInference
-from src.core.models.registry import MODELS, ModelDefinition
+from orchestrator.inference.backends.local import HuggingFaceInference
+from orchestrator.inference.registry import MODELS, ModelDefinition
+from orchestrator.inference.sources import huggingface as huggingface_source
 
 
 def test_model_registry_declares_runtime_for_every_model():
@@ -15,25 +16,40 @@ def test_model_registry_declares_runtime_for_every_model():
     }
     assert all(model.runtime for model in MODELS.values())
     assert all(isinstance(model, ModelDefinition) for model in MODELS.values())
-    assert MODELS["text"].hf_repo == "Qwen/Qwen2.5-0.5B-Instruct"
-    assert MODELS["transcription"].hf_repo == "Systran/faster-whisper-small"
-    assert MODELS["embedding"].hf_repo == "sentence-transformers/all-MiniLM-L6-v2"
+    assert MODELS["text"].locator == "Qwen/Qwen2.5-0.5B-Instruct"
+    assert MODELS["transcription"].locator == "Systran/faster-whisper-small"
+    assert MODELS["embedding"].locator == "sentence-transformers/all-MiniLM-L6-v2"
     assert MODELS["audio"].allow_patterns == (
         "en/en_US/lessac/medium/en_US-lessac-medium.onnx",
         "en/en_US/lessac/medium/en_US-lessac-medium.onnx.json",
     )
 
 
-def test_embedding_downloads_snapshot_and_reuses_then_reloads_local_runtime(monkeypatch, tmp_path):
-    monkeypatch.setattr(huggingface, "MODEL_CACHE_DIR", tmp_path)
+def test_huggingface_source_resolves_catalog_locator_with_token_and_allow_patterns(monkeypatch, tmp_path):
     downloadCalls = []
 
     def download(**kwargs):
         downloadCalls.append(kwargs)
-        path = tmp_path / f"snapshot-{len(downloadCalls)}"
-        path.mkdir()
-        return str(path)
+        return str(tmp_path)
 
+    monkeypatch.setattr(huggingface_source, "snapshot_download", download)
+    source = huggingface_source.HuggingFaceSource(
+        cache_dir=tmp_path,
+        token="hf-download-token",
+        allow_patterns=MODELS["audio"].allow_patterns,
+    )
+    path = asyncio.run(source.resolve(MODELS["audio"].locator))
+
+    assert path == tmp_path
+    assert downloadCalls == [{
+        "repo_id": MODELS["audio"].locator,
+        "local_dir": str(tmp_path),
+        "token": "hf-download-token",
+        "allow_patterns": list(MODELS["audio"].allow_patterns),
+    }]
+
+
+def test_embedding_runtime_loads_only_after_source_path_is_supplied(monkeypatch, tmp_path):
     class SentenceTransformer:
         def __init__(self, path, device):
             self.path = path
@@ -44,57 +60,29 @@ def test_embedding_downloads_snapshot_and_reuses_then_reloads_local_runtime(monk
             assert convert_to_numpy is True
             return [[0.1, 0.2], [0.3, 0.4]]
 
-    monkeypatch.setattr(huggingface, "snapshot_download", download)
     monkeypatch.setitem(
         sys.modules,
         "sentence_transformers",
         SimpleNamespace(SentenceTransformer=SentenceTransformer),
     )
-    provider = HuggingFaceInference(model="embedding", token="hf-download-token")
-    otherProvider = HuggingFaceInference(model="embedding")
+    provider = HuggingFaceInference(model="embedding", model_path=tmp_path)
+    otherProvider = HuggingFaceInference(model="embedding", model_path=tmp_path)
     assert provider._runtime is None and otherProvider._runtime is None
 
     result = asyncio.run(provider.embed(["hello", "Forge"]))
     assert result == [[0.1, 0.2], [0.3, 0.4]]
-    assert len(downloadCalls) == 1
-    assert downloadCalls[0]["repo_id"] == "sentence-transformers/all-MiniLM-L6-v2"
-    assert downloadCalls[0]["token"] == "hf-download-token"
-    assert downloadCalls[0]["local_dir"].endswith("Embed")
-
-    asyncio.run(provider.close())
-    asyncio.run(provider.embed(["hello", "Forge"]))
-    assert len(downloadCalls) == 2
+    assert provider._runtime.path == str(tmp_path)
     assert otherProvider._runtime is None
 
 
-def test_model_defaults_are_source_controlled_and_registry_controls_download(monkeypatch, tmp_path):
-    monkeypatch.setattr(huggingface, "MODEL_CACHE_DIR", tmp_path)
-    monkeypatch.setenv("FORGE_MODEL_CACHE", str(tmp_path / "ignored-cache"))
-    monkeypatch.setenv("FORGE_MODEL_DEVICE", "cuda")
-    monkeypatch.setenv("FORGE_STT_MODEL", "ignored/model")
-    calls = []
-
-    def download(**kwargs):
-        calls.append(kwargs)
-        path = tmp_path / "Voice"
-        path.mkdir()
-        return str(path)
-
-    monkeypatch.setattr(huggingface, "snapshot_download", download)
+def test_local_runtime_requires_an_explicit_resolved_path():
     provider = HuggingFaceInference(model="audio")
-
-    assert provider._device == "cpu"
-    assert provider._cacheDir == tmp_path
-    provider._localPath()
-    assert calls == [{
-        "repo_id": "rhasspy/piper-voices",
-        "local_dir": str(tmp_path / "Voice"),
-        "token": None,
-        "allow_patterns": [
-            "en/en_US/lessac/medium/en_US-lessac-medium.onnx",
-            "en/en_US/lessac/medium/en_US-lessac-medium.onnx.json",
-        ],
-    }]
+    try:
+        provider._localPath()
+    except RuntimeError as exc:
+        assert "resolved by an inference source" in str(exc)
+    else:
+        raise AssertionError("A local model path must be resolved by an inference source.")
 
 
 def test_text_generation_uses_local_transformers_and_registry_parameters(monkeypatch, tmp_path):
@@ -138,7 +126,6 @@ def test_text_generation_uses_local_transformers_and_registry_parameters(monkeyp
             observed["generation"] = kwargs
             return [[1, 2, 3]]
 
-    monkeypatch.setattr(huggingface, "snapshot_download", lambda **kwargs: str(tmp_path))
     monkeypatch.setitem(
         sys.modules,
         "transformers",
@@ -146,8 +133,7 @@ def test_text_generation_uses_local_transformers_and_registry_parameters(monkeyp
     )
     monkeypatch.setitem(sys.modules, "torch", SimpleNamespace(inference_mode=nullcontext))
 
-    monkeypatch.setattr(huggingface, "MODEL_CACHE_DIR", tmp_path)
-    provider = HuggingFaceInference(model="text")
+    provider = HuggingFaceInference(model="text", model_path=tmp_path)
     result = asyncio.run(provider.generateText(
         "user: hello",
         max_new_tokens=12,
@@ -161,6 +147,85 @@ def test_text_generation_uses_local_transformers_and_registry_parameters(monkeyp
     assert "stop" not in observed["generation"]
     assert observed["tokenizer"] == (str(tmp_path), True)
     assert observed["model"] == (str(tmp_path), True)
+
+
+def test_text_streaming_yields_provider_chunks_without_retokenizing(monkeypatch, tmp_path):
+    class Tokens(dict):
+        def to(self, device):
+            return self
+
+    class Tokenizer:
+        @classmethod
+        def from_pretrained(cls, path, local_files_only):
+            return cls()
+
+        def __call__(self, text=None, return_tensors=None, **_kwargs):
+            return Tokens(input_ids=[[1, 2]])
+
+        def decode(self, tokens, skip_special_tokens):
+            return "unused"
+
+    class Streamer:
+        def __init__(self, *_args, timeout, **_kwargs):
+            self.items = queue.Queue()
+            self.timeout = timeout
+
+        def __iter__(self):
+            return self
+
+        def __next__(self):
+            item = self.items.get(timeout=self.timeout)
+            if item is None:
+                raise StopIteration
+            return item
+
+        def put(self, item):
+            self.items.put(item)
+
+        def end(self):
+            self.items.put(None)
+
+    class StoppingCriteria:
+        pass
+
+    class StoppingCriteriaList(list):
+        pass
+
+    class Model:
+        @classmethod
+        def from_pretrained(cls, path, local_files_only):
+            return cls()
+
+        def to(self, device):
+            return None
+
+        def eval(self):
+            return None
+
+        def generate(self, **kwargs):
+            kwargs["streamer"].put("token ")
+            kwargs["streamer"].put("stream")
+            kwargs["streamer"].end()
+
+
+    monkeypatch.setitem(
+        sys.modules,
+        "transformers",
+        SimpleNamespace(
+            AutoTokenizer=Tokenizer,
+            AutoModelForCausalLM=Model,
+            StoppingCriteria=StoppingCriteria,
+            StoppingCriteriaList=StoppingCriteriaList,
+            TextIteratorStreamer=Streamer,
+        ),
+    )
+    monkeypatch.setitem(sys.modules, "torch", SimpleNamespace(inference_mode=nullcontext))
+
+    async def collect():
+        provider = HuggingFaceInference(model="text", model_path=tmp_path)
+        return [chunk async for chunk in provider.streamText("prompt", max_new_tokens=8)]
+
+    assert asyncio.run(collect()) == ["token ", "stream"]
 
 
 def test_local_faster_whisper_runtime_transcribes_audio(monkeypatch, tmp_path):
@@ -181,10 +246,8 @@ def test_local_faster_whisper_runtime_transcribes_audio(monkeypatch, tmp_path):
             observed["transcribe"] = options
             return iter([Segment()]), SimpleNamespace(language="en")
 
-    monkeypatch.setattr(huggingface, "snapshot_download", lambda **kwargs: str(tmp_path))
     monkeypatch.setitem(sys.modules, "faster_whisper", SimpleNamespace(WhisperModel=WhisperModel))
-    monkeypatch.setattr(huggingface, "MODEL_CACHE_DIR", tmp_path)
-    provider = HuggingFaceInference(model="transcription")
+    provider = HuggingFaceInference(model="transcription", model_path=tmp_path)
     result = asyncio.run(provider.transcribe(
         b"audio bytes",
         "audio/wav",
@@ -227,7 +290,7 @@ def test_local_image_runtime_loads_diffusers_pipeline(monkeypatch, tmp_path):
         "diffusers",
         SimpleNamespace(DiffusionPipeline=DiffusionPipeline),
     )
-    provider = HuggingFaceInference(model="image")
+    provider = HuggingFaceInference(model="image", model_path=tmp_path)
     pipeline = provider._loadRuntime(tmp_path)
     result = pipeline(prompt="sunrise", num_inference_steps=4)
     assert result == "local image result"
@@ -264,7 +327,7 @@ def test_vision_registry_model_uses_vision_transformers_runtime(monkeypatch, tmp
         "transformers",
         SimpleNamespace(AutoProcessor=Processor, AutoModelForVision2Seq=Model),
     )
-    runtime = HuggingFaceInference(model="vision")._loadRuntime(tmp_path)
+    runtime = HuggingFaceInference(model="vision", model_path=tmp_path)._loadRuntime(tmp_path)
     assert isinstance(runtime, tuple)
     assert observed == {
         "processor": (str(tmp_path), True),

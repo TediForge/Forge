@@ -3,9 +3,9 @@
 import json
 from pathlib import Path
 
-from src.api.v1.responses.routes import IntentResult, ExecutionPlanner
-from src.core.schemas.input import ExternalToolDefinition
-from src.tools.registry import create_default_registry
+from orchestrator.engine.engine import IntentResult, ExecutionPlanner
+from orchestrator.schemas.v1.responses import ExternalToolDefinition
+from orchestrator.tools.registry import create_default_registry
 
 
 class GoldenPlanDispatcher:

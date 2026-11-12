@@ -2,7 +2,10 @@ import re
 from pathlib import Path
 
 
-DEFINITIONS = Path(__file__).resolve().parents[2] / "src" / "tools" / "definitions"
+DEFINITIONS = (
+    Path(__file__).resolve().parents[2]
+    / "src" / "orchestrator" / "tools" / "definitions"
+)
 PERSISTENCE_IMPORT = re.compile(
     r"^\s*(?:import|from)\s+(?:sqlite3|redis|psycopg|sqlalchemy)\b",
     re.MULTILINE,

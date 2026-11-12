@@ -3,14 +3,13 @@
 Forge Orchestrator is a Python service for coordinating text, document, image,
 video, data, and audio tasks through one API. It combines request validation,
 planning, specialist agents, local tools, model dispatch, and response
-synthesis. Model inference runs locally; public model weights are downloaded
-from the Hugging Face Hub when first needed.
+synthesis. Inference is routed through a registry and gateway that separate
+model capabilities, artifact sources, and execution backends.
 
-> **Runtime note:** The HTTP application is mounted, but not every capability
-> is ready by default. In particular, the `ForgeEngine` text and image
-> dispatchers need an injected provider for model-backed orchestration. The
-> dedicated model routes load their registered local models; transcription and
-> speech synthesis use local faster-whisper and Piper runtimes.
+> **Runtime note:** The FastAPI lifespan owns a shared, lazy-loading inference
+> gateway. The default local source is Hugging Face Hub; explicit local paths
+> are supported without network access. Upstream trusted-principal middleware
+> is still required before exposing protected routes.
 
 ## Table of contents
 
@@ -38,9 +37,13 @@ from the Hugging Face Hub when first needed.
 - Registered local tools for document, data, image, video, and other supported
   operations.
 - Structured Thought, Action, and Status events, including streaming responses.
+- Provider-backed token streaming for the local Transformers text runtime.
 - Caller-owned external tools that can suspend a run and resume with the
   caller's result.
-- Input validation, execution limits, audit records, and durable checkpoints.
+- Input validation, execution limits, terminal audit records, and durable
+  checkpoints.
+- `/health`, `/ready`, Prometheus-format `/metrics`, request IDs, and
+  OpenTelemetry spans when an exporter is configured.
 
 ## System architecture
 
@@ -63,28 +66,39 @@ FastAPI routes ──► Pydantic validation and access checks
 Forge orchestration engine
   classify ──► refine ──► plan ──► select agent / invoke local tool
                                          │
-                  ┌──────────────────────┼──────────────────────┐
-                  ▼                      ▼                      ▼
-           Local model runtimes    Local tool registry     Caller-owned tools
-           Transformers,           PDF, data, image,       suspend the run;
-           Diffusers, embeddings,  video, search, etc.     caller executes
-           faster-whisper, Piper                          and resumes it
-                  └──────────────────────┼──────────────────────┘
+                  ┌──────────────────────┼───────────────────────┐
+                  ▼                      ▼                       ▼
+          Inference Gateway      Local tool registry       Caller-owned tools
+             ▲       ▲           PDF, data, image,          suspend the run;
+             │       │           video, search, etc.         caller executes
+       Sources     Backends                                   and resumes it
+       Hub/local   Transformers, Piper,
+                   Whisper, Diffusers
+                  └──────────────────────┼───────────────────────┘
                                          ▼
                           Synthesize response and events
                           Save configured checkpoints/audit
+
+Offline post-training (future):
+  runs / evaluation ──► orchestrator.rl ──► versioned policy artifact
+                                             └─► inference source
 ```
 
-Local model weights are fetched from the Hugging Face Hub and run on the
-application machine. Public repositories do not require a Hub token; `HF_TOKEN`
-is only needed for private or gated repositories. No hosted-model API key is
-required by this project configuration. Web search and model-weight downloads
-do require network access.
+The registry binds model IDs and capabilities to a source and default backend.
+The gateway resolves artifacts and owns backend caching, execution limits,
+metrics, and shutdown. Hugging Face is one source; local filesystem paths do
+not require network access. Transformers is the required local backend;
+vLLM, SGLang, TensorRT-LLM, llama.cpp, and remote OpenAI-compatible backends
+are optional and are not yet production implementations. Public Hub repositories
+do not require a token; `HF_TOKEN` is only needed for private or gated
+repositories.
 
-The default `ForgeEngine()` does not configure text or image providers.
-Applications that use model-backed `/v1/responses` orchestration must inject
-the intended providers. The dedicated chat, embeddings, model-catalog, and
-audio routes have their own local model paths.
+The application creates one `InferenceGateway` per lifespan and closes it
+after serving. Engine and tools use that gateway or modality facades; model
+backends and Hub clients remain inside `orchestrator.inference`. The local
+Transformers backend emits provider token chunks for streaming responses.
+`orchestrator.rl` is an offline-only scaffold and is never imported by serving
+code; its future policy artifacts may be loaded by inference sources.
 
 ## Workflow examples
 
@@ -150,6 +164,45 @@ Caller sends tool definitions
 
 The caller remains responsible for authorization, credentials, and execution
 of external services. See [the external-tools contract](docs/references/external-tools.md).
+To resume, send the matching function output to the same Responses endpoint:
+
+```http
+POST /v1/responses
+Content-Type: application/json
+
+{
+  "previous_response_id": "run_abc123",
+  "messages": [
+    {
+      "type": "function_call_output",
+      "call_id": "call_123456",
+      "output": "{\"number\":42}"
+    }
+  ]
+}
+```
+
+There is no separate `/resume` route.
+
+Successful Responses include a `sources` array. Each source uses the
+`SourceReference` contract; document-specific details such as file and page
+are carried in `metadata`:
+
+```json
+{
+  "runId": "run_abc123",
+  "status": "completed",
+  "content": [{"type": "text", "text": "The report shows steady growth."}],
+  "sources": [
+    {
+      "title": "report.pdf, page 4",
+      "url": "report.pdf#page=4",
+      "sourceType": "document",
+      "metadata": {"file": "report.pdf", "page": 4}
+    }
+  ]
+}
+```
 
 ## Technology stack
 
@@ -178,8 +231,8 @@ python -m venv .venv
 .\.venv\Scripts\Activate.ps1
 python -m pip install --upgrade pip
 python -m pip install -r requirements.txt
+python -m pip install -e ".[test]"
 Copy-Item .env.example .env
-python -m pip install pytest
 ```
 
 On macOS or Linux, activate the environment with
@@ -193,6 +246,8 @@ deployment:
 ```env
 # Persistent checkpoint directory
 FORGE_CHECKPOINT_ROOT=data/checkpoints
+# Required when FORGE_ENVIRONMENT=production; mount on persistent storage.
+FORGE_ENVIRONMENT=development
 
 # Request size limits
 FORGE_MEDIA_MAX_BYTES=20971520
@@ -202,33 +257,42 @@ FORGE_ATTACHMENT_MAX_BYTES=10485760
 # Optional Hugging Face Hub token for private or gated model weights
 HF_TOKEN=
 
-# Training export is disabled unless enabled here and requested per Responses call
-FORGE_TRAINING_EXPORT_ENABLED=false
-FORGE_TRAINING_EXPORT_DIR=logs/training-export
+# Trajectory export is disabled unless enabled here and requested per Responses call
+FORGE_TRAJECTORY_EXPORT_ENABLED=false
+FORGE_TRAJECTORY_EXPORT_DIR=logs/trajectories
 
 # Optional one-way upload of exported JSONL files
 FORGE_HF_SYNC_ENABLED=false
 FORGE_HF_TOKEN=
 FORGE_HF_REPO_ID=
 FORGE_HF_REPO_TYPE=dataset
+
+# Optional OpenTelemetry collector endpoint (HTTP/protobuf).
+# OTEL_EXPORTER_OTLP_ENDPOINT=http://localhost:4318/v1/traces
 ```
 
-Treat Hub tokens as secrets. Training export and Hub synchronization are
-disabled by default. Do not enable them unless the data-handling requirements
-for the deployment explicitly allow it. See
-[the training export decision](docs/decisions/D-005-training-export-scope.md).
+Treat Hub tokens as secrets. Trajectory export and Hub synchronization are
+disabled by default. Export is bounded, versioned JSONL with redaction, for
+evaluation and possible future preference tuning—not automatic model training.
+Do not enable it unless the data-handling requirements for the deployment
+explicitly allow it. See
+[the trajectory export decision](docs/decisions/D-005-training-export-scope.md).
 
 No cloud inference API key is required by the current project configuration.
 The local model catalog downloads model weights from the Hugging Face Hub;
 optional Hub tokens are for gated/private downloads or the separately disabled
 upload feature, not hosted inference.
+Set `FORGE_ENVIRONMENT=production` and an explicit
+`FORGE_CHECKPOINT_ROOT` for deployments; startup fails if the production
+checkpoint root is not configured. Checkpoint and audit storage should be on
+durable, access-controlled storage.
 
 ## Run the service
 
 Start the development server from the repository root:
 
 ```powershell
-uvicorn src.api:app --host 127.0.0.1 --port 8000 --reload --env-file .env
+uvicorn orchestrator.api:app --host 127.0.0.1 --port 8000 --reload --env-file .env
 ```
 
 Open the interactive API documentation at
@@ -239,6 +303,12 @@ can be queried with:
 Invoke-RestMethod http://127.0.0.1:8000/v1/models
 ```
 
+`GET /health` reports process liveness, `GET /ready` checks checkpoint
+writability and required local text weights, and `GET /metrics` exposes
+in-process run counts, aggregate duration, tool calls, and estimated tokens.
+Configure `OTEL_EXPORTER_OTLP_ENDPOINT` to export the instrumented classify,
+refine, plan, agent/model, tool, and stream-synthesis spans.
+
 `/v1/responses`, chat, embeddings, and audio operations require a trusted
 middleware layer to populate `request.state.principal`. The current FastAPI
 application does not implement that authentication boundary itself; do not
@@ -246,25 +316,27 @@ expose it directly to untrusted clients.
 
 ## Python usage
 
-The local model implementation can also be called directly. This example uses
-the registered local text model through Transformers; the model is downloaded
-on first use and then loaded for local inference.
+The inference gateway can also be called directly. This example resolves the
+registered local text model through the configured source and backend.
 
 ```python
 import asyncio
 
-from src.core.models.huggingface import HuggingFaceInference
+from orchestrator.inference.gateway import InferenceGateway
+from orchestrator.inference.protocols import InferenceRequest
 
 
 async def main() -> None:
-    model = HuggingFaceInference(model="text")
+    gateway = InferenceGateway()
     try:
-        answer = await model.generateText(
-            "Summarize why local inference can reduce data exposure."
-        )
-        print(answer)
+        response = await gateway.infer(InferenceRequest(
+            model_id="text",
+            modality="text",
+            input="Summarize why local inference can reduce data exposure.",
+        ))
+        print(response.output)
     finally:
-        await model.close()
+        await gateway.close()
 
 
 asyncio.run(main())
@@ -282,14 +354,18 @@ dispatchers; consult the
 ```text
 .
 ├── src/
-│   ├── agents/                 Specialist agents
-│   ├── api/                    FastAPI routes
-│   ├── context/                Run state, limits, and checkpoints
-│   ├── core/models/            Local model registry and dispatchers
-│   ├── export/                 Opt-in training export
-│   ├── sandbox/                File and execution boundaries
-│   ├── synthesis/              Response formatting
-│   └── tools/                  Local tools and tool execution
+│   └── orchestrator/
+│       ├── agents/             Specialist agents
+│       ├── api/                FastAPI routes and lifespan
+│       ├── context/            Run state, limits, and metrics
+│       ├── engine/engine.py    ForgeEngine and graph execution
+│       ├── export/             Opt-in trajectory export
+│       ├── inference/          Registry, gateway, sources, backends, facades
+│       ├── rl/                 Offline post-training boundary and eval fixture
+│       ├── sandbox/            File and execution boundaries
+│       ├── security/           Identity, RBAC, audit, checkpoints
+│       ├── synthesis/          Response formatting and SSE
+│       └── tools/              Local tools and tool execution
 ├── docs/
 │   ├── architecture/           Runtime architecture
 │   ├── decisions/              Architecture decision records
@@ -298,7 +374,9 @@ dispatchers; consult the
 ├── .env.example                Environment template
 ├── CONTRIBUTING.md             Contribution process
 ├── LICENSE                     Proprietary license
-└── requirements.txt            Runtime dependencies
+├── pyproject.toml               Package and dependency metadata
+├── requirements.txt             Container dependency ranges
+└── uv.lock                      Resolved dependency lockfile
 ```
 
 ## Testing
@@ -327,5 +405,5 @@ written authorization. See [LICENSE](LICENSE).
 ## Support
 
 For project questions or defects, open an issue in the
-[TediForge Ochestrator repository](https://github.com/TediForge/ochestrator/issues).
+[TediForge Forge repository](https://github.com/TediForge/Forge/issues).
 Do not include credentials, private user data, or sensitive production logs.

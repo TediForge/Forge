@@ -3,11 +3,11 @@ import json
 
 import httpx
 
-from src.api import app
-from src.api.v1.responses.routes import ForgeEngine, IntentResult, RefinedPrompt
-from src.core.security.audit import AuditLog
-from src.core.security.durability import CheckpointStore
-from src.core.security.identity import Principal
+from orchestrator.api import app
+from orchestrator.engine.engine import ForgeEngine, IntentResult, RefinedPrompt
+from orchestrator.security.audit import AuditLog
+from orchestrator.security.durability import CheckpointStore
+from orchestrator.security.identity import Principal
 
 
 class DirectDispatcher:
@@ -58,9 +58,9 @@ class AuthenticatedASGI:
 
 
 def test_forge_chat_never_exports_and_responses_requires_opt_in(tmp_path, monkeypatch):
-    export_dir = tmp_path / "training"
-    monkeypatch.setenv("FORGE_TRAINING_EXPORT_ENABLED", "true")
-    monkeypatch.setenv("FORGE_TRAINING_EXPORT_DIR", str(export_dir))
+    export_dir = tmp_path / "trajectories"
+    monkeypatch.setenv("FORGE_TRAJECTORY_EXPORT_ENABLED", "true")
+    monkeypatch.setenv("FORGE_TRAJECTORY_EXPORT_DIR", str(export_dir))
 
     async def scenario():
         previous_engine = getattr(app.state, "engine", None)
@@ -131,15 +131,16 @@ def test_forge_chat_never_exports_and_responses_requires_opt_in(tmp_path, monkey
 
                 response = await client.post("/v1/responses", json={
                     "messages": [{"role": "user", "content": "hello"}],
-                    "metadata": {"trainingExport": True},
+                    "trajectoryExport": True,
                 })
                 assert response.status_code == 200
                 assert response.json()["content"] == [
                     {"type": "text", "text": "hello from Forge", "metadata": {}},
                 ]
-                await app.state.engine.trainingExporter.shutdown()
+                await app.state.engine.trajectoryExporter.shutdown()
                 lines = [json.loads(line) for path in export_dir.glob("*.jsonl") for line in path.read_text(encoding="utf-8").splitlines()]
                 assert len(lines) == 1
+                assert lines[0]["schemaVersion"] == "1.0"
                 assert lines[0]["messages"] == [
                     {"role": "user", "content": "hello"},
                     {"role": "assistant", "content": "hello from Forge"},
@@ -211,4 +212,3 @@ def test_model_catalog_and_embeddings_use_forge_models():
                 app.state.embeddingProvider = previous_provider
 
     asyncio.run(scenario())
-

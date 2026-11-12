@@ -4,7 +4,7 @@ from pathlib import Path
 
 import pytest
 
-from src.tools.registry import ToolRegistry, create_default_registry
+from orchestrator.tools.registry import ToolRegistry, create_default_registry
 
 
 def test_registered_tool_names_are_one_lowercase_word_and_have_skills():
@@ -33,7 +33,9 @@ def test_every_registered_tool_skill_has_examples_and_named_edge_cases():
     registry = create_default_registry()
 
     for name in registry.names():
-        skill = (project_root / "src" / "skills" / "tools" / name / "SKILL.md").read_text(encoding="utf-8")
+        skill = (
+            project_root / "src" / "orchestrator" / "skills" / "tools" / name / "SKILL.md"
+        ).read_text(encoding="utf-8")
         assert len(skill.splitlines()) < 500
         assert "## When to use" in skill
         assert "## When not to use" in skill
@@ -48,7 +50,7 @@ def test_every_registered_tool_skill_has_examples_and_named_edge_cases():
 
 def test_tool_skill_folders_match_registered_tool_names_exactly():
     project_root = Path(__file__).parents[2]
-    skill_root = project_root / "src" / "skills" / "tools"
+    skill_root = project_root / "src" / "orchestrator" / "skills" / "tools"
     registered = set(create_default_registry().names())
     skill_names = {
         directory.name for directory in skill_root.iterdir()

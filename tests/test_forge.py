@@ -1,15 +1,18 @@
 import asyncio
 import json
 import unittest
+from pathlib import Path
 from types import SimpleNamespace
 from fastapi import HTTPException
 
-from src.agents import AgentRegistry, create_default_agents
-from src.context.state import ExecutionState
-from src.context.limits import ExecutionBudget, ExecutionLimits, ExecutionLimitError
-from src.tools.registry import create_default_registry
-from src.core.attachments import AttachmentDispatcherRouter
-from src.api.v1.responses.routes import (
+from orchestrator.agents import AgentRegistry, create_default_agents
+from orchestrator.context.state import ExecutionState
+from orchestrator.context.limits import ExecutionBudget, ExecutionLimits, ExecutionLimitError
+from orchestrator.context.metrics import RuntimeMetrics
+from orchestrator.inference.modalities import TextDispatcher
+from orchestrator.tools.registry import create_default_registry
+from orchestrator.attachments import AttachmentDispatcherRouter
+from orchestrator.engine.engine import (
     ExecutionEvaluator,
     ExecutionPlan,
     ExecutionPlanner,
@@ -17,13 +20,13 @@ from src.api.v1.responses.routes import (
     ForgeEngine,
     IntentResult,
 )
-from src.core.schemas.input import AttachmentPayload, ExternalToolDefinition, ResponsesRequest
-from src.core.security.identity import Principal
-from src.core.security.rbac import Permission, authorize, require_authorization
-from src.core.security.audit import AuditLog, redact
-from src.core.security.durability import CheckpointStore
-from src.synthesis.output import OutputSynthesizer
-from src.core.schemas.output import TerminalStatus
+from orchestrator.schemas.v1.responses import AttachmentPayload, ExternalToolDefinition, ResponsesRequest
+from orchestrator.security.identity import Principal
+from orchestrator.security.rbac import Permission, authorize, require_authorization
+from orchestrator.security.audit import AuditLog, redact
+from orchestrator.security.durability import CheckpointStore
+from orchestrator.synthesis.output import OutputSynthesizer
+from orchestrator.schemas.v1.responses import TerminalStatus
 from pydantic import ValidationError
 
 
@@ -48,6 +51,91 @@ class ForgeProductionTests(unittest.TestCase):
         ))
         self.assertEqual("".join(block.text or "" for block in result.content), "answer")
         self.assertEqual(result.metadata["status"], "completed")
+
+    def test_streaming_uses_dispatcher_chunks_and_persists_terminal_state(self):
+        class Provider:
+            def generate_text(self, prompt=None, **_kwargs):
+                return INTENT if "Analyze intent" in prompt else "answer"
+
+            async def stream_text(self, prompt=None, **_kwargs):
+                yield "first "
+                yield "token"
+
+        async def run():
+            from tempfile import TemporaryDirectory
+
+            with TemporaryDirectory() as directory:
+                root = Path(directory)
+                principal = Principal("user-1", "tenant-stream", roles=("operator",))
+                engine = ForgeEngine(
+                    text_dispatcher=TextDispatcher(Provider()),
+                    checkpoint_store=CheckpointStore(root / "checkpoints"),
+                    audit_log=AuditLog(root / "audit.jsonl"),
+                )
+                try:
+                    stream = await engine.run("hello", stream=True, principal=principal)
+                    frames = [frame async for frame in stream]
+                    complete = next(frame for frame in frames if frame.startswith("event: complete\n"))
+                    packet = json.loads(complete.split("data: ", 1)[1])
+                    checkpoint = engine.checkpointStore.load(
+                        principal.tenant_id,
+                        packet["data"]["runId"],
+                        "completed",
+                    )
+                    return frames, checkpoint
+                finally:
+                    await engine.close()
+
+        frames, checkpoint = asyncio.run(run())
+        text_frames = [frame for frame in frames if frame.startswith("event: textChunk\n")]
+        self.assertEqual(len(text_frames), 2)
+        self.assertIn('"content":"first "', text_frames[0])
+        self.assertIn('"content":"token"', text_frames[1])
+        complete = next(frame for frame in frames if frame.startswith("event: complete\n"))
+        packet = json.loads(complete.split("data: ", 1)[1])
+        content = "".join(block.get("text", "") for block in packet["data"]["content"])
+        self.assertEqual(content, "first token")
+        self.assertIsNotNone(checkpoint)
+        self.assertEqual(checkpoint["status"], "completed")
+
+    def test_shared_engine_concurrent_runs_keep_audit_and_checkpoints_isolated(self):
+        class Provider:
+            def generate_text(self, prompt=None, **_kwargs):
+                return INTENT if "Analyze intent" in prompt else "answer"
+
+        async def run():
+            from tempfile import TemporaryDirectory
+
+            with TemporaryDirectory() as directory:
+                root = Path(directory)
+                engine = ForgeEngine(
+                    text_dispatcher=TextDispatcher(Provider()),
+                    checkpoint_store=CheckpointStore(root / "checkpoints"),
+                    audit_log=AuditLog(root / "audit.jsonl"),
+                    metrics=RuntimeMetrics(),
+                )
+                principal = Principal("user-1", "tenant-concurrent", roles=("operator",))
+                try:
+                    responses = await asyncio.gather(
+                        engine.run("first request", principal=principal),
+                        engine.run("second request", principal=principal),
+                    )
+                    run_ids = {response.runId for response in responses}
+                    completed = list((root / "checkpoints" / principal.tenant_id).glob("*.completed.json"))
+                    entries = [
+                        json.loads(line)
+                        for line in (root / "audit.jsonl").read_text(encoding="utf-8").splitlines()
+                    ]
+                    return run_ids, completed, entries, engine.metrics.render()
+                finally:
+                    await engine.close()
+
+        run_ids, completed, entries, metrics = asyncio.run(run())
+        self.assertEqual(len(run_ids), 2)
+        self.assertEqual({path.name.split(".")[0] for path in completed}, run_ids)
+        self.assertEqual(sum(entry["event"] == "run.completed" for entry in entries), 2)
+        self.assertEqual(sum(entry["event"] == "run.planned" for entry in entries), 2)
+        self.assertIn('forge_runs_total{status="completed"} 2', metrics)
 
     def test_agent_messages_and_scratchpad(self):
         async def run():
@@ -151,6 +239,25 @@ class ForgeProductionTests(unittest.TestCase):
     def test_evaluator_stops_repeated_outputs(self):
         result = ExecutionEvaluator().evaluate("finish task", ["same result", "same result"])
         self.assertEqual(result.decision, "stop")
+
+    def test_async_evaluator_uses_structured_provider_and_score_history(self):
+        requests = []
+
+        async def generate_structured(**kwargs):
+            requests.append(kwargs)
+            return {
+                "decision": "continue",
+                "progress_score": 0.8,
+                "reasoning": "The result advances the objective.",
+            }
+
+        async def run():
+            evaluator = ExecutionEvaluator(SimpleNamespace(generate_structured=generate_structured))
+            return await evaluator.evaluate_async("finish task", ["first result"], [0.6])
+
+        result = asyncio.run(run())
+        self.assertEqual(result.progress_score, 0.8)
+        self.assertIn('"previous_scores": [0.6]', requests[0]["prompt"])
 
     def test_responses_request_schema(self):
         request = ResponsesRequest.model_validate({

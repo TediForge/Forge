@@ -4,8 +4,8 @@ from types import SimpleNamespace
 
 import httpx
 
-from src.api import app
-from src.core.security.identity import Principal
+from orchestrator.api import app
+from orchestrator.security.identity import Principal
 
 
 class AuthenticatedASGI:

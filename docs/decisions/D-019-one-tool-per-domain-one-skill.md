@@ -80,10 +80,10 @@ dispatch. The handler also returns a structured `INVALID_OPERATION` or
 
 ## Implementation
 
-- `src/tools/definitions/data.py` registers only `data`; table, SQL, profile,
+- `src/orchestrator/tools/definitions/data.py` registers only `data`; table, SQL, profile,
   join, report, and chart handlers are private dispatch targets.
-- `src/tools/definitions/image.py` and `video.py` remain one tool each.
-- `src/skills/tools/data/SKILL.md` contains the data operations table and
+- `src/orchestrator/tools/definitions/image.py` and `video.py` remain one tool each.
+- `src/orchestrator/skills/tools/data/SKILL.md` contains the data operations table and
   shared usage guidance; the former operation-named skill folders are
   removed.
 - See also [Orchestrator Runtime §9](../architecture/orchestrator-runtime.md)

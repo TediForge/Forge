@@ -1,7 +1,7 @@
 import asyncio
 import json
 
-from src.tools.executor import ToolExecutor, ToolResult
+from orchestrator.tools.executor import ToolExecutor, ToolResult
 
 
 class SchemaRegistry:
@@ -49,9 +49,9 @@ def test_executor_validates_required_type_enum_and_unknown_tools():
 
 
 def test_audit_error_details_do_not_include_raw_arguments(tmp_path):
-    from src.api.v1.responses.routes import ForgeEngine
-    from src.context.state import ExecutionState
-    from src.core.security.audit import AuditLog
+    from orchestrator.engine.engine import ForgeEngine
+    from orchestrator.context.state import ExecutionState
+    from orchestrator.security.audit import AuditLog
 
     registry = SchemaRegistry()
     engine = ForgeEngine(audit_log=AuditLog(tmp_path / "audit.jsonl"))

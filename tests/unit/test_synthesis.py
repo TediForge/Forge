@@ -1,7 +1,7 @@
 import asyncio
 import json
 
-from src.synthesis import OutputSynthesizer, aggregate_output_items
+from orchestrator.synthesis import OutputSynthesizer, aggregate_output_items
 
 
 def test_aggregation_excludes_reasoning_and_collects_explicit_sources_and_assets():

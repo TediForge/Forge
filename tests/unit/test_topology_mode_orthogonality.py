@@ -1,9 +1,9 @@
 import asyncio
 
-from src.api.v1.responses.routes import ExecutionPlan, ExecutionPlanner, ExecutionStep, ForgeEngine, IntentResult, RefinedPrompt
-from src.core.schemas.input import ExecutionMode, ExternalToolDefinition, OrchestratorRequest
-from src.core.security.audit import AuditLog
-from src.core.security.durability import CheckpointStore
+from orchestrator.engine.engine import ExecutionPlan, ExecutionPlanner, ExecutionStep, ForgeEngine, IntentResult, RefinedPrompt
+from orchestrator.schemas.v1.responses import ExternalToolDefinition, OrchestratorRequest
+from orchestrator.security.audit import AuditLog
+from orchestrator.security.durability import CheckpointStore
 
 
 class PlanDispatcher:
@@ -47,7 +47,7 @@ class PlanDispatcher:
 
 
 def _principal():
-    from src.core.security.identity import Principal
+    from orchestrator.security.identity import Principal
 
     return Principal("user-1", "tenant-a", roles=("operator",))
 
@@ -80,9 +80,9 @@ def test_planner_receives_effort_and_interactive_run_suspends_independently(tmp_
         "session-mode",
         principal=_principal(),
         external_tools=[ExternalToolDefinition(name="externallookup", description="lookup")],
-        mode=ExecutionMode.FAST,
+        reasoning_effort="low",
     ))
-    assert "Execution effort: fast" in dispatcher.planner_prompt
+    assert "Execution effort: low" in dispatcher.planner_prompt
     assert pending.status == "requires_action"
 
 
@@ -123,9 +123,9 @@ def test_expert_effort_with_autonomous_topology_does_not_suspend(tmp_path):
         "calculate then answer",
         "session-expert",
         principal=_principal(),
-        mode=ExecutionMode.EXPERT,
+        reasoning_effort="high",
     ))
-    assert "Execution effort: expert" in dispatcher.planner_prompt
+    assert "Execution effort: high" in dispatcher.planner_prompt
     assert response.status == "completed"
     assert response.functionCalls is None
 
@@ -142,7 +142,7 @@ def test_expert_effort_with_interactive_topology_still_suspends(tmp_path):
         "session-expert-interactive",
         principal=_principal(),
         external_tools=[ExternalToolDefinition(name="externallookup", description="lookup")],
-        mode=ExecutionMode.EXPERT,
+        reasoning_effort="high",
     ))
-    assert "Execution effort: expert" in dispatcher.planner_prompt
+    assert "Execution effort: high" in dispatcher.planner_prompt
     assert pending.status == "requires_action"

@@ -1,6 +1,6 @@
 from pathlib import Path
 
-from src.tools import definitions
+from orchestrator.tools import definitions
 
 
 def test_tool_definitions_do_not_configure_or_call_openai():

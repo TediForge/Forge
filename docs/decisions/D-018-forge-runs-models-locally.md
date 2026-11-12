@@ -15,9 +15,8 @@ parameters.
 ## Decision
 
 Hugging Face Hub is a model-weight source, not an inference provider.
-`HuggingFaceInference` downloads a model snapshot through
-`huggingface_hub.snapshot_download`, loads it into the runtime declared by
-`ModelDefinition.runtime`, and performs inference on the deployed machine.
+`HuggingFaceSource` resolves a configured model locator, then a backend loads
+the resolved local artifact and performs inference on the deployed machine.
 The Hub token is optional and is used only to download private model weights.
 
 Runtime selection is explicit. Text generation uses Transformers, diffusion
@@ -30,8 +29,9 @@ inference endpoints.
 ## Consequences
 
 - `HF_TOKEN` is a model-download credential, not an inference credential.
-- Model repositories are selected in `src/core/models/registry.py`; replacing
-  those repository IDs is how a Forge-trained model is adopted.
+- Default artifact locators are selected in
+  `src/orchestrator/inference/registry.py`; source configuration can override
+  them when adopting a local or privately stored model artifact.
 - Model cache, CPU devices, and transcription compute type are fixed in the
   local runtime source, not deployment environment variables.
 - Model loading is lazy and cached for the application lifetime.

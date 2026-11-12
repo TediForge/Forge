@@ -4,8 +4,8 @@ import io
 import wave
 from types import SimpleNamespace
 
-from src.api.v1.audio.sts.routes import StsSession
-from src.core.security.identity import Principal
+from orchestrator.api.v1.audio.sts.routes import StsSession
+from orchestrator.security.identity import Principal
 
 
 class FakeWebSocket:

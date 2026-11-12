@@ -3,9 +3,8 @@ import re
 
 from fastapi import FastAPI
 
-from src.api.v1.responses.http import router
-from src.core.schemas.input import OrchestratorRequest
-from src.core.schemas.output import (
+from orchestrator.api.v1.responses.http import router
+from orchestrator.schemas.v1.responses import (
     ActionRecord,
     CompleteStreamEvent,
     ContentBlock,
@@ -13,6 +12,7 @@ from src.core.schemas.output import (
     FunctionCall,
     FunctionCallStreamEvent,
     MediaStreamEvent,
+    OrchestratorRequest,
     RunStatus,
     TextChunkData,
     TextChunkStreamEvent,
@@ -31,14 +31,14 @@ def test_request_contract_uses_tools_reasoning_and_messages_for_resume():
         "tools": [],
         "previous_response_id": "run-1",
         "reasoning": {"effort": "xhigh"},
-        "metadata": {"trainingExport": True},
+        "trajectoryExport": True,
     })
     dumped = request.model_dump(by_alias=True)
     assert dumped["tools"] == []
     assert dumped["previous_response_id"] == "run-1"
     assert dumped["messages"][0]["call_id"] == "call_123456"
     assert dumped["reasoning"]["effort"] == "xhigh"
-    assert dumped["metadata"]["trainingExport"] is True
+    assert dumped["trajectoryExport"] is True
     assert not {
         "externalTools", "external_tools", "functionCallOutputs",
         "function_call_outputs", "trainingExport", "topology", "sessionId",
@@ -145,7 +145,7 @@ def test_native_request_uses_messages_with_per_turn_base64_attachments():
 def test_stream_events_discriminate_packet_and_timeline_types():
     import pytest
     from pydantic import TypeAdapter, ValidationError
-    from src.core.schemas.output import StreamEvent
+    from orchestrator.schemas.v1.responses import StreamEvent
 
     adapter = TypeAdapter(StreamEvent)
     parsed = adapter.validate_python({
@@ -166,7 +166,7 @@ def test_stream_events_discriminate_packet_and_timeline_types():
 def test_stream_complete_timeline_matches_emitted_event_packets():
     import asyncio
 
-    from src.synthesis.output import OutputSynthesizer
+    from orchestrator.synthesis.output import OutputSynthesizer
 
     async def source():
         yield {"type": "thought", "data": {"id": "T123AB", "message": "Starting"}}

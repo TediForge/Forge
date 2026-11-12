@@ -17,8 +17,8 @@ Slack, Notion, Linear, Canva, Hevy, or Tripsy access.
 The orchestrator owns no external service integrations. External services are
 caller-owned `tools`, suspended with `call_id` and resumed through a
 `function_call_output` item in `messages` under D-004. The caller owns credentials, adapters,
-policy, and any service-specific skills. `src/tools/definitions/` contains
-only local tools; `src/skills/tools/` contains skills only for those tools.
+policy, and any service-specific skills. `src/orchestrator/tools/definitions/` contains
+only local tools; `src/orchestrator/skills/tools/` contains skills only for those tools.
 
 ## Consequences
 
@@ -27,7 +27,7 @@ only local tools; `src/skills/tools/` contains skills only for those tools.
 - Callers must supply their own external function schemas and execute returned
   function calls.
 - The caller may ship its own skill; external service skills do not live in
-  the orchestrator's `src/skills/`.
+  the orchestrator's `src/orchestrator/skills/`.
 - The existing external-tool suspension/resume path remains the interface;
   this decision does not change it.
 

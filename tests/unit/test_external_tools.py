@@ -1,9 +1,9 @@
 import asyncio
 
-from src.api.v1.responses.routes import ExecutionPlan, ExecutionStep, ForgeEngine, IntentResult, RefinedPrompt
-from src.core.schemas.input import ExternalToolDefinition, FunctionCallOutput, OrchestratorRequest
-from src.core.security.audit import AuditLog
-from src.core.security.durability import CheckpointStore
+from orchestrator.engine.engine import ExecutionPlan, ExecutionStep, ForgeEngine, IntentResult, RefinedPrompt
+from orchestrator.schemas.v1.responses import ExternalToolDefinition, FunctionCallOutput, OrchestratorRequest
+from orchestrator.security.audit import AuditLog
+from orchestrator.security.durability import CheckpointStore
 
 
 def _external_tool(name="getweather"):
@@ -268,7 +268,7 @@ def test_stream_suspension_emits_function_call_and_complete_payload(tmp_path):
 
 
 def _principal():
-    from src.core.security.identity import Principal
+    from orchestrator.security.identity import Principal
 
     return Principal(user_id="user-1", tenant_id="tenant-a", roles=("operator",))
 

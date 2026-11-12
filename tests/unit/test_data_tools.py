@@ -5,11 +5,11 @@ import sys
 import time
 from types import SimpleNamespace
 
-from src.tools.definitions.data import (
+from orchestrator.tools.definitions.data import (
     TOOLS,
     data,
 )
-from src.sandbox import cleanupTmp
+from orchestrator.sandbox import cleanupTmp
 
 
 def test_all_enterprise_data_tools_declare_output_schemas():

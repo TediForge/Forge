@@ -6,18 +6,18 @@ from types import SimpleNamespace
 from pypdf import PdfWriter
 from PIL import Image as PillowImage
 
-from src.tools.definitions.audio import audio
-from src.tools.definitions.clock import clock
-from src.tools.definitions.extract import extract
-from src.tools.definitions.fetch import fetch
-from src.tools.definitions.generate import generate
-from src.tools.definitions.image import generate as generateImage
-from src.tools.definitions.pdf import pdf
-from src.tools.definitions.search import search
-from src.tools.definitions.spreadsheet import sheet
-from src.tools.definitions.summarize import summarize
-from src.tools.definitions.translate import translate
-from src.tools.definitions.weather import OpenMeteoAdapter, weather
+from orchestrator.tools.definitions.audio import audio
+from orchestrator.tools.definitions.clock import clock
+from orchestrator.tools.definitions.extract import extract
+from orchestrator.tools.definitions.fetch import fetch
+from orchestrator.tools.definitions.generate import generate
+from orchestrator.tools.definitions.image import generate as generateImage
+from orchestrator.tools.definitions.pdf import pdf
+from orchestrator.tools.definitions.search import search
+from orchestrator.tools.definitions.spreadsheet import sheet
+from orchestrator.tools.definitions.summarize import summarize
+from orchestrator.tools.definitions.translate import translate
+from orchestrator.tools.definitions.weather import OpenMeteoAdapter, weather
 
 
 def _blankPdf() -> bytes:
@@ -126,7 +126,7 @@ def test_weather_tool_owns_open_meteo_http_client(monkeypatch):
             assert "current" in params
             return Response()
 
-    monkeypatch.setattr("src.tools.definitions.weather.httpx.AsyncClient", Client)
+    monkeypatch.setattr("orchestrator.tools.definitions.weather.httpx.AsyncClient", Client)
 
     result = asyncio.run(OpenMeteoAdapter().get("current", 10, 20, 1))
 
@@ -187,7 +187,7 @@ def test_spreadsheet_info_and_structured_extractors_succeed(sandboxWorkspace):
 def test_audio_trim_and_convert_use_staged_ffmpeg_outputs(sandboxWorkspace, monkeypatch):
     source = sandboxWorkspace / "uploads" / "source.wav"
     source.write_bytes(b"source audio")
-    monkeypatch.setattr("src.tools.definitions.audio.shutil.which", lambda _: "ffmpeg")
+    monkeypatch.setattr("orchestrator.tools.definitions.audio.shutil.which", lambda _: "ffmpeg")
 
     def fakeRun(command, **kwargs):
         assert "-n" in command
@@ -197,7 +197,7 @@ def test_audio_trim_and_convert_use_staged_ffmpeg_outputs(sandboxWorkspace, monk
         Path(command[-1]).write_bytes(b"processed audio")
         return SimpleNamespace(returncode=0)
 
-    monkeypatch.setattr("src.tools.definitions.audio.subprocess.run", fakeRun)
+    monkeypatch.setattr("orchestrator.tools.definitions.audio.subprocess.run", fakeRun)
 
     trimmed = audio(
         "trim", path="uploads/source.wav", output_path="outputs/clip.wav",

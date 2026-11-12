@@ -2,9 +2,9 @@ import asyncio
 import json
 from types import SimpleNamespace
 
-from src.api.v1.responses.routes import ForgeEngine
-from src.core.security.audit import AuditLog
-from src.core.security.durability import CheckpointStore
+from orchestrator.engine.engine import ForgeEngine
+from orchestrator.security.audit import AuditLog
+from orchestrator.security.durability import CheckpointStore
 
 
 INTENT = json.dumps({
@@ -29,7 +29,7 @@ def test_responses_run_calls_tmp_cleanup_and_continues_if_cleanup_fails(monkeypa
 
     provider = SimpleNamespace(generate=generate)
     provider.generate_text = generate
-    monkeypatch.setattr("src.api.v1.responses.routes.cleanupTmp", failCleanup)
+    monkeypatch.setattr("orchestrator.engine.engine.cleanupTmp", failCleanup)
     engine = ForgeEngine(
         text_dispatcher=provider,
         checkpoint_store=CheckpointStore(tmp_path / "checkpoints"),

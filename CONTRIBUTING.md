@@ -36,6 +36,10 @@ python -m pip install pytest
 python -m pytest
 ```
 
+For production configuration, set `FORGE_ENVIRONMENT=production` and provide
+`FORGE_CHECKPOINT_ROOT` on persistent storage. The service will not start in
+production without the checkpoint root.
+
 ## Pull requests
 
 - Create a focused branch, such as `feat/local-embeddings` or
@@ -54,7 +58,7 @@ changes; no review-time guarantee is implied.
 ## Security reports
 
 Do not report suspected vulnerabilities in public issues. Use
-[GitHub's private vulnerability reporting](https://github.com/TediForge/ochestrator/security/advisories/new)
+[GitHub's private vulnerability reporting](https://github.com/TediForge/Forge/security/advisories/new)
 for this repository.
 
 ## Getting help

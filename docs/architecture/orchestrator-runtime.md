@@ -1,9 +1,32 @@
 # Forge Orchestrator Runtime [PARTIAL]
 
-Code-accurate description of `backend/orchestrator`. “Implemented” describes
-reachable code behavior, not production readiness. Round 3 entries below are
-preserved as historical evidence; the current state and later decision records
-take precedence where behavior has changed.
+This inventory documents implementation status, not production readiness.
+Its older round-by-round sections are historical snapshots and may refer to
+superseded module paths; the current serving architecture is summarized here
+and decisions D-024 and D-025 take precedence.
+
+## Current inference and data boundaries
+
+```text
+API / engine / tools
+        │
+        ▼
+InferenceGateway ──► registry ──► source ──► backend
+        ▲                               Hub / local path / artifact store
+        │                               Transformers / modality runtimes
+        └── stable requests, metrics, limits, lifecycle
+
+Offline evaluation / future post-training
+        └── orchestrator.rl ──► versioned policy artifact ──► inference source
+```
+
+Engine and tool inference calls use the gateway or modality facades. Hugging
+Face Hub access is isolated to `inference/sources/`; model execution belongs
+to `inference/backends/`. The app lifespan owns and closes one gateway.
+Responses schemas are grouped under `schemas/v1/responses/`. Trajectory export
+is opt-in, versioned, redacted, and bounded; the RL package is an offline-only
+scaffold and is not imported by serving code. See [D-024](../decisions/D-024-multisource-inference-gateway.md)
+and [D-025](../decisions/D-025-response-effort-suggestions-trajectories.md).
 
 ## Table of contents
 
@@ -50,9 +73,9 @@ take precedence where behavior has changed.
 | **Round 3 — Fixes & Verification** | | | |
 | 2026-11-09 | Uwagbae | Fixed | Registered Canva's stable Thought IDs; `ForgeEngine()` now constructs while integration credentials/client initialization remain deferred until tool call. G-001 resolved. |
 | 2026-11-09 | Uwagbae | Fixed | Constrained pytest discovery to this project's `tests/` and added the in-process smoke test; the suite now passes with local `test_eval.py` collection. |
-| 2026-11-09 | Uwagbae | Added | Moved `sandbox/` to `src/sandbox/`; updated source, tests, and policy references. |
+| 2026-11-09 | Uwagbae | Added | Moved `sandbox/` to `src/orchestrator/sandbox/`; updated source, tests, and policy references. |
 | 2026-11-09 | Uwagbae | Added | Mounted `/v1/orchestrate` as a request-validated 501 skeleton; generated OpenAPI now contains the route. |
-| 2026-11-09 | Uwagbae | Removed | Deleted the unused `src/agents/title/` SDK path; `_generateTitle()` remains the implemented title path. |
+| 2026-11-09 | Uwagbae | Removed | Deleted the unused `src/orchestrator/agents/title/` SDK path; `_generateTitle()` remains the implemented title path. |
 | 2026-11-09 | Uwagbae | Verified | Full suite: `63 passed`; smoke test: `1 passed`; route-contract test passes; pytest collection is rooted in this project. |
 | 2026-11-09 | Uwagbae | Changed | Replaced the external chat passthrough with Forge Text model completions; mounted registry-backed models and Hugging Face embeddings endpoints; request title option is `generateTitle`. |
 | 2026-11-09 | Uwagbae | Changed | Made `/v1/chat/completions` and `/v1/models` use OpenAI-compatible request/response field shapes while retaining Forge/Hugging Face model inference; added model lookup by ID and standard generation parameters. |
@@ -86,7 +109,7 @@ take precedence where behavior has changed.
   over an authenticated push-to-talk WebSocket.
 - `/v1/orchestrate` remains deleted and is not aliased or relocated.
 - `ForgeEngine` remains a library entry point in
-  `src/api/v1/responses/routes.py`. It constructs without registry-level event
+  `src/orchestrator/api/v1/responses/routes.py`. It constructs without registry-level event
   ID metadata; there are no credentials for caller-owned service integrations.
 - External tool definitions are planner schemas only. Local tools execute
   through `ToolRegistry`; caller-owned external calls persist a `suspended`
@@ -127,11 +150,11 @@ take precedence where behavior has changed.
 
 ## 1. Executive summary [PARTIAL]
 
-- `src/api/__init__.py` mounts `/v1/responses`, `/v1/chat/completions`,
+- `src/orchestrator/api/__init__.py` mounts `/v1/responses`, `/v1/chat/completions`,
   `/v1/models`, `/v1/embeddings`, and the two batch audio endpoints; it also
   mounts the `/v1/audio/sts` WebSocket and
   creates/closes the engine and training exporter through lifespan.
-- `ForgeEngine` is a library entry point inside `src/api/v1/responses/routes.py`; this file is not a mounted HTTP route module.
+- `ForgeEngine` is a library entry point inside `src/orchestrator/api/v1/responses/routes.py`; this file is not a mounted HTTP route module.
 - Default `ForgeEngine()` construction succeeds with the built-in tool registry; it does not load caller-owned service adapters.
 - Thought, Action, and Status events are distinct; Action lifecycle is included in streaming and static response shapes.
 - Default text and image dispatchers have no providers. Speech tools use the
@@ -186,16 +209,21 @@ All entries in `requirements.txt` are version ranges (`>=` and `<`), not exact p
 `Dockerfile` uses `python:3.11-slim`, installs `build-essential`, `ffmpeg`, and `tesseract-ocr`, installs `requirements.txt`, copies the package, exposes port `8000`, and runs:
 
 ```text
-uvicorn src.api:app --host 0.0.0.0 --port 8000
+uvicorn orchestrator.api:app --host 0.0.0.0 --port 8000
 ```
 
 That command starts the FastAPI application; lifespan creates the engine and
 mounted versioned routes. Deployment must still provide upstream identity
 middleware and any provider credentials.
 
-## 3. Directory & module map [PARTIAL]
+## 3. Historical pre-consolidation directory map [HISTORICAL]
 
-Paths are relative to `backend/orchestrator`. Python cache files and generated test data are omitted.
+The tree below records an earlier package layout and is retained as historical
+context; its `core/`, top-level `skills/`, and `models/` paths are not current
+directories. The active `src/orchestrator/` package layout is summarized in
+the [project README](../../README.md). In particular, inference ownership now
+belongs to `src/orchestrator/inference/`; no `orchestrator.models`
+compatibility package is retained.
 
 ```text
 docs/
@@ -348,12 +376,12 @@ TODO                                Development notes
 logs/                               Default audit-log directory at runtime
 ```
 
-**Empty/stale files [DEAD / STALE]:** `src/api/health.py`,
-`src/core/config.py`, and `src/core/models/loader.py` remain empty. Chat
-Completions is mounted from `src/api/v1/chat/completions/routes.py`;
-Responses HTTP binding is in `src/api/v1/responses/http.py`;
-`responses/routes.py` remains the engine implementation. The obsolete
-`/v1/orchestrate` stub remains deleted.
+**Current implementation paths:** the FastAPI app and lifespan are in
+`src/orchestrator/api/__init__.py`; Chat Completions is mounted from
+`src/orchestrator/api/v1/chat/completions/routes.py`; Responses HTTP binding
+is in `src/orchestrator/api/v1/responses/http.py`; and the engine is in
+`src/orchestrator/engine/engine.py`. Model catalog and gateway ownership are
+under `src/orchestrator/inference/`.
 
 ### Dead and library-only inventory [PARTIAL]
 
@@ -362,15 +390,14 @@ Responses HTTP binding is in `src/api/v1/responses/http.py`;
 | Path | Symbol/component | Reachable from engine/app? | Suggested action |
 |---|---|---|---|
 | `src/ochestrator/*` | SDK `OrchestrationRunner` and stream-event wrapper | No; custom engine uses `BaseAgent`/`AgentRegistry` | [DEAD / STALE] Round 3 decision: rename spelling if kept, otherwise remove after checking external imports |
-| `src/core/config.py` | Empty config module | No | [DEAD / STALE] Remove or implement when config ownership is decided |
-| `src/core/models/loader.py` | Empty model loader | No | [DEAD / STALE] Remove or wire to an explicit provider factory |
-| `src/api/health.py` | Empty health module | No | [DEAD / STALE] Implement health endpoints only if this app owns them; otherwise remove |
+| `src/orchestrator/api/health.py` | Empty health module | No | [DEAD / STALE] Implement health endpoints only if this app owns them; otherwise remove |
 | Conversation title generation | Client-owned under D-013 | No title tool, route, request field, or response field | [REMOVED] |
 | Approval, policy, ABAC, egress helpers | Removed by D-003 | No current runtime capability | [REMOVED] Reintroduce only with an authoritative boundary and end-to-end enforcement |
-| `src/core/security/runtime.py` | `ProductionIdentityResolver` | Core backend-owned; not called by orchestrator app/run | [LIBRARY ONLY] Core backend resolves verified caller identity |
-| `src/context/idempotency.py` | In-memory `IdempotencyStore` | No; request key not passed to run | [LIBRARY ONLY] Wire at the authenticated HTTP boundary or remove |
+| `src/orchestrator/security/runtime.py` | `ProductionIdentityResolver` | Core backend-owned; not called by orchestrator app/run | [LIBRARY ONLY] Core backend resolves verified caller identity |
+| `src/orchestrator/context/idempotency.py` | In-memory `IdempotencyStore` | No; request key not passed to run | [LIBRARY ONLY] Wire at the authenticated HTTP boundary or remove |
 
-These are inventory recommendations, not deletion instructions. `src/ochestrator/` remains unchanged this round; its spelling is separately tracked in G-031.
+These are inventory recommendations, not deletion instructions. This table contains findings from the historical tree above; recheck every
+path against the active package before acting on an inventory recommendation.
 
 ## 4. HTTP layer — actual vs intended [PARTIAL]
 
@@ -509,7 +536,7 @@ interactive.
 `ForgeEngine.run` additionally accepts external function schemas, topology,
 effort mode, and per-request training export. `previous_response_id` and
 `function_call_outputs` are handled by `ForgeEngine.resume`. `HistoryMessage.content`
-has `Field(..., max_length=8000)` (`src/core/schemas/input.py`,
+has `Field(..., max_length=8000)` (`src/orchestrator/schemas/input.py`,
 `HistoryMessage`).
 
 ## 6. Engine construction & dependency injection [PARTIAL]
@@ -546,7 +573,7 @@ to handlers. Default engine construction is independent of Action metadata.
 
 ### Current lifespan behavior [PARTIAL]
 
-`src/api/__init__.py` creates the engine during lifespan and assigns it to
+`src/orchestrator/api/__init__.py` creates the engine during lifespan and assigns it to
 `app.state.engine`. On shutdown it awaits `engine.trainingExporter.shutdown()`
 so any queued records are flushed. Provider factory/settings and public
 tool-registry close-all remain unimplemented; do not treat unconfigured
@@ -558,14 +585,14 @@ See lifecycle gaps G-003 and G-026.
 
 | Module | Import-time work found | Deferred work |
 |---|---|---|
-| `src/api/__init__.py` | Creates FastAPI and imports the versioned routers | Lifespan constructs the engine and shuts down the exporter |
-| `src/api/v1/responses/routes.py` | Defines engine/helpers; no skill-file read | `_load_skill()` reads when classification/refinement/title helpers execute |
+| `src/orchestrator/api/__init__.py` | Creates FastAPI and imports the versioned routers | Lifespan constructs the engine and shuts down the exporter |
+| `src/orchestrator/api/v1/responses/routes.py` | Defines engine/helpers; no skill-file read | `_load_skill()` reads when classification/refinement/title helpers execute |
 | `sandbox/pathPolicy.py` | Defines path-policy functions; no policy JSON read or environment lookup | `_sandboxRoot()` reads `FORGE_SANDBOX_ROOT`; `_loadPolicy()` reads `policy.json` when a safe path/cleanup call occurs |
-| `src/core/security/runtime.py` | Defines resolver class | `FORGE_ALLOW_ANONYMOUS` is read by resolver construction |
-| `src/core/security/audit.py`, `src/core/security/durability.py` | No directory creation on import | Constructors create log/checkpoint directories |
-| `src/tools/definitions/` / `src/tools/executor.py` | No tool handlers or HTTP clients are created on import | The engine creates its shared media converter; handlers execute only when selected |
+| `src/orchestrator/security/runtime.py` | Defines resolver class | `FORGE_ALLOW_ANONYMOUS` is read by resolver construction |
+| `src/orchestrator/security/audit.py`, `src/orchestrator/security/durability.py` | No directory creation on import | Constructors create log/checkpoint directories |
+| `src/orchestrator/tools/definitions/` / `src/orchestrator/tools/executor.py` | No tool handlers or HTTP clients are created on import | The engine creates its shared media converter; handlers execute only when selected |
 
-A cold subprocess running `from src.api.v1.responses.routes import ForgeEngine` exited successfully in about 13.34 seconds on this environment; this wall time includes interpreter startup and transitive imports, so it is not an isolated module-import benchmark. The app module imports router definitions; engine/client construction remains deferred to ASGI lifespan.
+A cold subprocess running `from orchestrator.engine.engine import ForgeEngine` exited successfully in about 13.34 seconds on this environment; this wall time includes interpreter startup and transitive imports, so it is not an isolated module-import benchmark. The app module imports router definitions; engine/client construction remains deferred to ASGI lifespan.
 
 ## 7. End-to-end request lifecycle (`ForgeEngine.run` and `resume`) [PARTIAL]
 
@@ -601,9 +628,9 @@ and extracted attachment content are excluded from checkpoint exports.
 
 ### 7.4 Intent classification and prompt refinement [PARTIAL]
 
-`IntentClassifier` reads cached `src/skills/classifier/SKILL.md`; with a provider it tries structured output, then text/JSON output. Without a provider it returns deterministic text/chat intent. Invalid JSON or invalid intent shape raises `ValueError`; an async return from this synchronous interface raises `RuntimeError`.
+`IntentClassifier` reads cached `src/orchestrator/skills/classifier/SKILL.md`; with a provider it tries structured output, then text/JSON output. Without a provider it returns deterministic text/chat intent. Invalid JSON or invalid intent shape raises `ValueError`; an async return from this synchronous interface raises `RuntimeError`.
 
-`PromptRefiner` selects a profile based on capability/modality and reads `src/skills/refiner/SKILL.md`. It uses structured/text provider output when available; malformed refinement output falls back to a deterministic prompt. An awaitable result from its sync interface raises rather than being awaited.
+`PromptRefiner` selects a profile based on capability/modality and reads `src/orchestrator/skills/refiner/SKILL.md`. It uses structured/text provider output when available; malformed refinement output falls back to a deterministic prompt. An awaitable result from its sync interface raises rather than being awaited.
 
 Both helpers receive extracted attachment content and the last ten conversation
 messages. History is included as `## Conversation so far`, capped at 2,000
@@ -658,27 +685,27 @@ There is no HTTP exception mapper. Direct static callers see uncaught exceptions
 
 | Exception | Source and trigger | Engine handling | What caller sees |
 |---|---|---|---|
-| `ExecutionLimitError` | `src/context/limits.py`; step/iteration/time/token/repeat limits and dependency cycles (`_orderedSteps`) | Caught at `begin_action()` boundaries; other raises such as token accounting or `_orderedSteps()` can escape | Status/termination for caught boundaries; otherwise exception propagates, including through stream iteration |
-| `AgentExecutionError` | `src/agents/base.py`; missing/invalid dispatcher result or retries exhausted | Agent wraps the final failure; run graph has no general catch | Propagates to static caller or stream iterator |
+| `ExecutionLimitError` | `src/orchestrator/context/limits.py`; step/iteration/time/token/repeat limits and dependency cycles (`_orderedSteps`) | Caught at `begin_action()` boundaries; other raises such as token accounting or `_orderedSteps()` can escape | Status/termination for caught boundaries; otherwise exception propagates, including through stream iteration |
+| `AgentExecutionError` | `src/orchestrator/agents/base.py`; missing/invalid dispatcher result or retries exhausted | Agent wraps the final failure; run graph has no general catch | Propagates to static caller or stream iterator |
 | `ValueError` | Classifier/planner input or plan failures; handler-owned descriptor errors | Constructor/engine have no global catch; malformed `PromptRefiner` output is handled by its deterministic fallback | Construction or unhandled run error propagates; no HTTP mapping |
 | `RuntimeError` | Classifier/refiner sync-interface awaitable misuse; `_dispatchStep` missing dispatcher/method | No outer catch (agent invocation may wrap it after retry) | Propagates, or appears as `AgentExecutionError` when raised within agent retries |
-| `KeyError` | `src/tools/registry.py:ToolRegistry.execute` for unknown name; adapters may index required arguments | No engine-level catch | Propagates to direct caller/stream consumer |
-| `TypeError` | `src/tools/executor.py:ToolExecutor.executeAsync` when arguments are not a mapping | No engine-level catch | Propagates to direct caller/stream consumer |
+| `KeyError` | `src/orchestrator/tools/registry.py:ToolRegistry.execute` for unknown name; adapters may index required arguments | No engine-level catch | Propagates to direct caller/stream consumer |
+| `TypeError` | `src/orchestrator/tools/executor.py:ToolExecutor.executeAsync` when arguments are not a mapping | No engine-level catch | Propagates to direct caller/stream consumer |
 | `asyncio.TimeoutError` | `asyncio.wait_for()` in static/stream graph | Graph catches wait timeout then calls `budget._stop()`, which raises `ExecutionLimitError` | Normally `ExecutionLimitError` |
 | `asyncio.CancelledError` | Task cancellation during awaited work | No explicit catch or `finally`; not swallowed by `except Exception` on supported Python | Cancellation propagates; no cancellation audit/checkpoint |
-| `IdentityContextError` / `PermissionError` | `src/core/security/identity.py`; missing IDs or denied RBAC permission | No run-level translation | Propagates to direct caller |
+| `IdentityContextError` / `PermissionError` | `src/orchestrator/security/identity.py`; missing IDs or denied RBAC permission | No run-level translation | Propagates to direct caller |
 
-`src/api/v1/responses/routes.py` has broad `except Exception` handling in cleanup/audit and evaluator fallback paths; some use silent fallback/ignore behavior. Other broad catches exist in agent retry and selected adapters/tools. No `except BaseException` or bare `except:` was found by source scan. These local catches do not form a consistent error contract.
+`src/orchestrator/api/v1/responses/routes.py` has broad `except Exception` handling in cleanup/audit and evaluator fallback paths; some use silent fallback/ignore behavior. Other broad catches exist in agent retry and selected adapters/tools. No `except BaseException` or bare `except:` was found by source scan. These local catches do not form a consistent error contract.
 
 ### 7.8 Output, stream, checkpoint and audit [PARTIAL]
 
-> **Round 2 correction:** Source availability was described generally; exact source shows `_executeGraphStatic()` initializes `sources = []` with no append. The stream graph emits `content` chunks. Those are separate confirmed behaviors (`src/api/v1/responses/routes.py`, `_executeGraphStatic`, `_executeGraphStream`).
+> **Round 2 correction:** Source availability was described generally; exact source shows `_executeGraphStatic()` initializes `sources = []` with no append. The stream graph emits `content` chunks. Those are separate confirmed behaviors (`src/orchestrator/api/v1/responses/routes.py`, `_executeGraphStatic`, `_executeGraphStream`).
 
-Static mode collects text, thoughts and media, appends assistant text to transient history, saves a `completed` checkpoint, and writes `run.completed`. Conversation titles are not generated or included in the response. `_executeGraphStatic()` sets `sources = []` and does not append to that list; no static source is produced (`src/api/v1/responses/routes.py`, `_executeGraphStatic`).
+Static mode collects text, thoughts and media, appends assistant text to transient history, saves a `completed` checkpoint, and writes `run.completed`. Conversation titles are not generated or included in the response. `_executeGraphStatic()` sets `sources = []` and does not append to that list; no static source is produced (`src/orchestrator/api/v1/responses/routes.py`, `_executeGraphStatic`).
 
 Stream mode returns an async generator after the planned checkpoint/audit. Text is generated as a complete step result first, then split on whitespace with a 20ms sleep between chunks; it is not provider token streaming. The graph yields text data as `{"content": chunk + " "}` (`_executeGraphStream`), with cancellation propagated by `_executeGraphStreamWithCancellation`. Stream events can carry `thought`, `textChunk`, and terminal `complete`; media/source are intermediate generator events, not valid public `StreamEvent` types. The current graph emits media but no source. The stream branch does not save a completed checkpoint or write `run.completed`.
 
-The checkpoint/audit branch is explicit in `ForgeEngine.run`: both modes first save `"planned"` and record `"run.planned"`; only the static `else` block saves `"completed"` and records `"run.completed"`. The returned stream generator has no such terminal write. (`src/api/v1/responses/routes.py`, `ForgeEngine.run`)
+The checkpoint/audit branch is explicit in `ForgeEngine.run`: both modes first save `"planned"` and record `"run.planned"`; only the static `else` block saves `"completed"` and records `"run.completed"`. The returned stream generator has no such terminal write. (`src/orchestrator/api/v1/responses/routes.py`, `ForgeEngine.run`)
 
 | Static branch | Stream branch |
 |---|---|
@@ -700,7 +727,7 @@ dispatcher wrappers/providers, `MediaConverter`, `AuditLog`, and
 | `AuditLog` | Appends file records | No thread/process lock; one append handle per record | [RISK] concurrent/multi-process line integrity unproven | Parallel static/stream runs yield intact JSON records, one per line |
 | `CheckpointStore` | Filesystem changes on save; store configuration stays fixed | No lock or atomic write; random run IDs reduce same-file collision | [RISK] concurrent writes and path containment unproven | Parallel saves/loads produce complete JSON isolated by tenant and run |
 
-`AuditLog.record()` (`src/core/security/audit.py`) contains no
+`AuditLog.record()` (`src/orchestrator/security/audit.py`) contains no
 synchronization. The app must not claim safe singleton-engine concurrency
 until these tests pass.
 
@@ -708,12 +735,12 @@ until these tests pass.
 
 | Specialist | Declared capability examples | Modalities | Prompt source | Retry behavior |
 |---|---|---|---|---|
-| Research | research, search, analysis, fact checking, web research | No modality-specific model; shared injected text dispatcher | Loaded lazily from `src/skills/agents/research/SKILL.md` through `BaseAgent.system_prompt` | `BaseAgent` default 2 attempts |
-| Coding | coding, code, review, debugging, testing, implementation | Shared injected text dispatcher | Loaded lazily from `src/skills/agents/coding/SKILL.md` | 2 attempts |
-| Document | document, PDF, invoice, table, structured RAG | Shared injected text dispatcher | Loaded lazily from `src/skills/agents/document/SKILL.md` | 2 attempts |
-| Data | data, analytics, SQL, pandas, reporting, spreadsheet | Shared injected text dispatcher | Loaded lazily from `src/skills/agents/data/SKILL.md` | 2 attempts |
-| Vision | vision, image/video understanding, OCR, object detection | Optional injected `vision` dispatcher with `analyze_image`; image bytes require a multimodal dispatcher | Loaded lazily from `src/skills/agents/vision/SKILL.md` | 2 attempts for text dispatch |
-| Media | image/video generation, composition, rendering | Shared injected text dispatcher; no Canvas/Video model binding | Loaded lazily from `src/skills/agents/media/SKILL.md` | 2 attempts |
+| Research | research, search, analysis, fact checking, web research | No modality-specific model; shared injected text dispatcher | Loaded lazily from `src/orchestrator/skills/agents/research/SKILL.md` through `BaseAgent.system_prompt` | `BaseAgent` default 2 attempts |
+| Coding | coding, code, review, debugging, testing, implementation | Shared injected text dispatcher | Loaded lazily from `src/orchestrator/skills/agents/coding/SKILL.md` | 2 attempts |
+| Document | document, PDF, invoice, table, structured RAG | Shared injected text dispatcher | Loaded lazily from `src/orchestrator/skills/agents/document/SKILL.md` | 2 attempts |
+| Data | data, analytics, SQL, pandas, reporting, spreadsheet | Shared injected text dispatcher | Loaded lazily from `src/orchestrator/skills/agents/data/SKILL.md` | 2 attempts |
+| Vision | vision, image/video understanding, OCR, object detection | Optional injected `vision` dispatcher with `analyze_image`; image bytes require a multimodal dispatcher | Loaded lazily from `src/orchestrator/skills/agents/vision/SKILL.md` | 2 attempts for text dispatch |
+| Media | image/video generation, composition, rendering | Shared injected text dispatcher; no Canvas/Video model binding | Loaded lazily from `src/orchestrator/skills/agents/media/SKILL.md` | 2 attempts |
 
 Capability matching normalizes underscores/case, adds 100 for exact capability and 20 if the modality itself is in agent capabilities, then selects the maximum. For current-turn image attachments, normalized base64 bytes are supplied to the vision agent; the configured vision dispatcher must implement `analyze_image(prompt=..., system_prompt=..., images=...)`.
 
@@ -767,8 +794,9 @@ The built-in `todo` and `memory` tools and their SQLite state store were
 removed under [D-022](../decisions/D-022-no-stateful-tools.md); callers that
 need durable state provide external tools under D-004. The `data` tool's
 read-only access to caller-provided SQLite files is not tool-owned storage.
-Tool-specific non-model integrations stay with their tool definition; the
-`src/core/models/adapters/` package contains AI model adapters only (D-023).
+Tool-specific non-model integrations stay with their tool definition.
+Inference modality facades and backends stay under
+`src/orchestrator/inference/` (D-023, D-024).
 
 Speech handlers use the local faster-whisper and Piper dispatchers through
 private dependencies injected by `ToolExecutor`; dispatchers are never
@@ -789,11 +817,11 @@ name and schema path, not raw arguments. See
 [D-006](../decisions/D-006-wire-camelcase-and-validation.md).
 
 Filesystem-facing local handlers enforce paths using `safePath()` in
-`src/sandbox/pathPolicy.py`. Media URLs produced by local tools are converted
+`src/orchestrator/sandbox/pathPolicy.py`. Media URLs produced by local tools are converted
 to bounded base64 before they can reach the model or response. Citation URLs
 are kept separately in `SourceReference`.
 
-## 10. Models & modality adapters [PARTIAL]
+## 10. Inference subsystem [IMPLEMENTED]
 
 ### Dispatchers [PARTIAL]
 
@@ -805,16 +833,15 @@ are kept separately in `SourceReference`.
 | `SttDispatcher` | `stt` | Local faster-whisper | Loads the configured Whisper model and returns transcript/segment data |
 
 `ToolExecutor` privately injects `audio` and `stt` dispatchers into their matching
-tool handlers after validating only model-supplied arguments against the tool
-schema. The local model libraries load lazily on first inference. The text and
-image dispatchers still require configured providers. Base `stream()` simply
-yields the complete `generate()` result; the engine does not call it.
-An injected `dispatcher_registry` can add other modality keys; default engine
-construction does not load model weights.
+tool handlers after validating model-supplied arguments against the tool
+schema. The app lifespan injects gateway-backed modality facades; a standalone
+`ForgeEngine` can receive custom dispatchers. The local model libraries load
+lazily on first inference, and the gateway owns backend caching and shutdown.
 
-### Model catalog and Hugging Face [PARTIAL]
+### Model catalog, sources, and backends [IMPLEMENTED]
 
-`src/core/models/registry.py` lists:
+`src/orchestrator/inference/registry.py` lists model IDs, capabilities,
+default artifact locators, and backends:
 
 | Key / model ID | Catalog capability summary | Engine dispatcher |
 |---|---|---|---|
@@ -828,17 +855,12 @@ construction does not load model weights.
 | `data` / Analyst | SQL, pandas, analytics, reporting | `Qwen/Qwen2.5-Coder-0.5B-Instruct` / Transformers |
 | `embedding` / Embed | Text embeddings | `sentence-transformers/all-MiniLM-L6-v2`; `/v1/embeddings` wired |
 
-`HuggingFaceInference` downloads the selected `hf_repo` with
-`snapshot_download`, loads it with the runtime declared on
-`ModelDefinition.runtime`, and performs inference locally. Runtime instances
-are cached on the application for reuse and released during lifespan shutdown.
-`HF_TOKEN` is passed to the Hub downloader only for private repositories.
-The model registry is the source of truth for model selection; replace the
-repository there when a Forge-trained model is ready. Cache location, CPU
-devices, and speech compute type are fixed constants in the local runtime and
-are not environment overrides.
-Supported local operations are `generateText()`, `embed()`, `generateImage()`,
-`transcribe()`, and `synthesize()`.
+`InferenceGateway` resolves each configured locator through its source, then
+constructs the selected backend with the local artifact path. Backends run the
+declared runtime locally; gateway instances are cached and closed with the
+application lifespan. `HF_TOKEN` is read only by `HuggingFaceSource` for Hub
+downloads. Model source and backend settings can override registry defaults.
+Optional backends that are not configured fail explicitly at resolution.
 
 The catalog endpoint exposes registry entries as OpenAI-compatible model
 objects. Catalog presence is metadata, not proof that model weights are
@@ -954,7 +976,7 @@ Historical Round 2 example captured from a simple static `ForgeEngine.run()` wit
 }
 ```
 
-`ExecutionState.exportState()` exports `runId`, variables except `attachmentContents`, `inlineAttachments`, `sessionHistory`, and `refinedPrompt`, plus `stepOutputs`; actual variable keys vary with the run (`src/context/state.py`, `ExecutionState.exportState`). Potentially sensitive values still include user/tenant IDs, prompts, attachment routing metadata/names, raw tool arguments, intent and plan instructions, scratchpad, agent messages, model/tool outputs, and the run ID. Inline attachment bytes and extracted attachment content are excluded.
+`ExecutionState.exportState()` exports `runId`, variables except `attachmentContents`, `inlineAttachments`, `sessionHistory`, and `refinedPrompt`, plus `stepOutputs`; actual variable keys vary with the run (`src/orchestrator/context/state.py`, `ExecutionState.exportState`). Potentially sensitive values still include user/tenant IDs, prompts, attachment routing metadata/names, raw tool arguments, intent and plan instructions, scratchpad, agent messages, model/tool outputs, and the run ID. Inline attachment bytes and extracted attachment content are excluded.
 
 `CheckpointStore._path()` validates tenant, run, and checkpoint components,
 resolves them, and checks both root and tenant containment. `save()` uses a
@@ -970,7 +992,7 @@ code-owned and intentionally absent from this environment table.
 | Variable | Consumer | Required? / purpose |
 |---|---|---|
 | `HF_TOKEN` | `HuggingFaceInference` | Optional; used only when downloading weights from private Hugging Face Hub repositories |
-| `FORGE_ALLOW_ANONYMOUS` | `src/core/security/runtime.py` | Optional; defaults to false; affects only standalone identity resolver |
+| `FORGE_ALLOW_ANONYMOUS` | `src/orchestrator/security/runtime.py` | Optional; defaults to false; affects only standalone identity resolver |
 | `FORGE_SANDBOX_ROOT` | `sandbox/pathPolicy.py` | Optional; overrides sandbox root; otherwise root is `sandbox/` |
 | `FORGE_CHECKPOINT_ROOT` | `CheckpointStore` | Optional; defaults to `data/checkpoints`; must be persistent in production |
 | `FORGE_CHECKPOINT_RETENTION_DAYS` | `CheckpointStore` | Optional; defaults to 30 days; minimum one day |
@@ -990,7 +1012,7 @@ Integration credentials live in the caller, not in the orchestrator.
 Model configuration is intentionally source-controlled in the model registry
 and local runtime constants, not environment variables.
 Sandbox roots/extensions/temporary retention are configured by
-`src/sandbox/policy.json`, with root override through `FORGE_SANDBOX_ROOT`.
+`src/orchestrator/sandbox/policy.json`, with root override through `FORGE_SANDBOX_ROOT`.
 
 ## 13. Observability [PARTIAL]
 
@@ -1048,7 +1070,7 @@ testpaths = ["tests"]
 pythonpath = [".", "tests"]
 ```
 
-`tests/conftest.py` reads `src/sandbox/policy.json`, creates a temporary policy/workspace, and sets `FORGE_SANDBOX_ROOT`; it contains no sibling-tree path insertion. The provenance command, run from the `tests` directory with the project root on `PYTHONPATH`, printed:
+`tests/conftest.py` reads `src/orchestrator/sandbox/policy.json`, creates a temporary policy/workspace, and sets `FORGE_SANDBOX_ROOT`; it contains no sibling-tree path insertion. The provenance command, run from the `tests` directory with the project root on `PYTHONPATH`, printed:
 
 ```text
 C:\TediForge\Forge\backend\orchestrator\tests\test_eval.py
@@ -1096,7 +1118,7 @@ tests/smoke/test_end_to_end.py::test_forge_engine_runs_end_to_end PASSED
 
 `tests/smoke/test_end_to_end.py` injects a stub text provider, constructs the default engine/tool registry, runs `say hi` with user/tenant identity and temporary audit/checkpoint paths, then asserts non-empty content and a `run_` ID. The full run and standalone smoke test both pass. No passing test establishes actual model-provider connectivity, successful HTTP request handling, cancellation behavior, concurrent runs, attachment-byte delivery, complete stream persistence/audit, or checkpoint path containment.
 
-The default `CheckpointStore().root` resolves relative to `src/core/security/durability.py` to `tests/checkpoints`; tests and the smoke test also use temporary checkpoint roots.
+The default `CheckpointStore().root` resolves relative to `src/orchestrator/security/durability.py` to `tests/checkpoints`; tests and the smoke test also use temporary checkpoint roots.
 
 The Rounds 4/5 suite removed approval/policy/ABAC/egress helper tests and the
 obsolete route test. It added Action ID catalog checks and Action lifecycle,
@@ -1112,39 +1134,39 @@ Each row has a status tag. `[RISK]` denotes impact beyond missing feature wiring
 | ID | Area | Status tag | What code does | What docs/intent say | Impact | Suggested owner/priority | Round 3 evidence |
 |---|---|---|---|---|---|---|---|
 | G-001 | Default engine construction | [RESOLVED] | Registry contains only local schemas/handlers and does not require construction-time event IDs; handlers own Action descriptors | Engine constructs with all registered local tools | Construction does not load external service credentials or clients | Orchestrator / Resolved | D-001, D-010; `ToolRegistry.register_module`; end-to-end smoke and Action contract tests |
-| G-002 | HTTP app | [PARTIAL] | Responses, Chat Completions, Models, Embeddings, and batch audio routes are mounted; `/v1/audio/sts` is a WebSocket; `/v1/orchestrate` remains absent | Core backend calls authenticated API routes | Trusted principal middleware and model/provider configuration remain deployment requirements | Core backend/orchestrator / P0 before exposure | `src/api/__init__.py`; HTTP integration tests |
-| G-003 | Startup/lifecycle | [PARTIAL] | Lifespan constructs the engine and shuts down the exporter; provider/media client close-all is not implemented | Runtime dependencies should be created and closed as a unit | Some client resources may outlive application shutdown | Orchestrator / P1 | `src/api/__init__.py`; exporter shutdown test |
-| G-004 | Empty route modules | [PARTIAL] | Health remains empty; chat completions, embeddings, and models now have mounted routes | Files imply route surfaces | Health surface remains absent | Orchestrator / P1 | `src/api/health.py`; model route integration tests |
+| G-002 | HTTP app | [PARTIAL] | Responses, Chat Completions, Models, Embeddings, and batch audio routes are mounted; `/v1/audio/sts` is a WebSocket; `/v1/orchestrate` remains absent | Core backend calls authenticated API routes | Trusted principal middleware and model/provider configuration remain deployment requirements | Core backend/orchestrator / P0 before exposure | `src/orchestrator/api/__init__.py`; HTTP integration tests |
+| G-003 | Startup/lifecycle | [PARTIAL] | Lifespan constructs the engine and shuts down the exporter; provider/media client close-all is not implemented | Runtime dependencies should be created and closed as a unit | Some client resources may outlive application shutdown | Orchestrator / P1 | `src/orchestrator/api/__init__.py`; exporter shutdown test |
+| G-004 | Empty route modules | [PARTIAL] | Health remains empty; chat completions, embeddings, and models now have mounted routes | Files imply route surfaces | Health surface remains absent | Orchestrator / P1 | `src/orchestrator/api/health.py`; model route integration tests |
 | G-005 | Engine filename | [PARTIAL] | `responses/routes.py` contains engine/helpers; `responses/http.py` contains the HTTP router | Path implies HTTP router | The package splits HTTP binding and engine implementation across files | Orchestrator / P2 | `responses/routes.py`; `responses/http.py` |
 | G-006 | OpenAPI snapshot | [PARTIAL] | Generated API includes the HTTP routes; WebSocket is not represented | Snapshot must match runtime contract | Stale generated schema may mislead clients | Orchestrator / P1 | `docs/openapi.json`; `app.openapi()["paths"]` |
-| G-007 | Request schema binding | [RESOLVED] | `/v1/responses` binds `OrchestratorRequest` and calls `run`/`resume` | Requests reach the engine | HTTP invocation is wired behind trusted `request.state.principal` | Orchestrator / Resolved | `src/api/v1/responses/http.py`; integration cycle test |
+| G-007 | Request schema binding | [RESOLVED] | `/v1/responses` binds `OrchestratorRequest` and calls `run`/`resume` | Requests reach the engine | HTTP invocation is wired behind trusted `request.state.principal` | Orchestrator / Resolved | `src/orchestrator/api/v1/responses/http.py`; integration cycle test |
 | G-008 | Request option enforcement | [PARTIAL] | `reasoning.effort`, `tools`, resume messages, stream, attachments, and `metadata.trainingExport` are mapped; topology and session IDs are server-owned | Schema options should affect execution | Unsupported options must not be assumed effective | Orchestrator / P1 | HTTP mapping and `ForgeEngine.run` signature |
-| G-009 | Attachment content | [RESOLVED] | MIME/signature-checked base64 is extracted and injected into classifier/refiner prompts under per-file/total caps; extraction text is excluded from checkpoint exports | Attachment content is usable without persisting user file bytes | Supported images/text reach prompt context; unsupported files fail explicitly | Orchestrator / Resolved | `src/core/attachments.py::AttachmentDispatcherRouter.extract_content`; `routes.py::ForgeEngine.run`; `context/state.py::ExecutionState.exportState`; `test_attachment_content.py` |
-| G-010 | History | [RESOLVED] | Last ten messages reach classifier/refiner and agent prompts in a bounded context block; history is transient and checkpoint snapshots retain names only | Context-aware follow-up requests | Recent context is available without storing historical attachment bytes | Orchestrator / Resolved | `src/context/session.py::SessionManager.recent` and `prompt_block`; `routes.py::ForgeEngine.run`/`resume`; `test_history_context.py` |
-| G-011 | Tool argument provenance | [RESOLVED] | `ToolExecutor` validates parsed argument objects against registered JSON Schema and returns typed `INVALID_ARGUMENTS` failures before dispatch | Registered schemas constrain caller-supplied arguments | Invalid arguments do not reach handlers; audit includes error path but no raw arguments | Orchestrator / Resolved | `src/tools/executor.py::ToolExecutor._validated_call`; `routes.py::ForgeEngine._executeToolCall`; `test_tool_argument_validation.py` |
-| G-012 | Tool-call budget | [RESOLVED] | Internal calls invoke `record_tool_call()` before dispatch; duplicate fingerprints stop after three repeats; caller-owned external calls are excluded | Default limit allows at most 20 internal calls | Over-budget internal runs terminate as failed with `tool_call_limit` | Orchestrator / Resolved | `src/context/limits.py::ExecutionBudget.record_tool_call`; `routes.py::_executeToolCall`; `test_tool_call_budget.py` |
+| G-009 | Attachment content | [RESOLVED] | MIME/signature-checked base64 is extracted and injected into classifier/refiner prompts under per-file/total caps; extraction text is excluded from checkpoint exports | Attachment content is usable without persisting user file bytes | Supported images/text reach prompt context; unsupported files fail explicitly | Orchestrator / Resolved | `src/orchestrator/attachments.py::AttachmentDispatcherRouter.extract_content`; `routes.py::ForgeEngine.run`; `context/state.py::ExecutionState.exportState`; `test_attachment_content.py` |
+| G-010 | History | [RESOLVED] | Last ten messages reach classifier/refiner and agent prompts in a bounded context block; history is transient and checkpoint snapshots retain names only | Context-aware follow-up requests | Recent context is available without storing historical attachment bytes | Orchestrator / Resolved | `src/orchestrator/context/session.py::SessionManager.recent` and `prompt_block`; `routes.py::ForgeEngine.run`/`resume`; `test_history_context.py` |
+| G-011 | Tool argument provenance | [RESOLVED] | `ToolExecutor` validates parsed argument objects against registered JSON Schema and returns typed `INVALID_ARGUMENTS` failures before dispatch | Registered schemas constrain caller-supplied arguments | Invalid arguments do not reach handlers; audit includes error path but no raw arguments | Orchestrator / Resolved | `src/orchestrator/tools/executor.py::ToolExecutor._validated_call`; `routes.py::ForgeEngine._executeToolCall`; `test_tool_argument_validation.py` |
+| G-012 | Tool-call budget | [RESOLVED] | Internal calls invoke `record_tool_call()` before dispatch; duplicate fingerprints stop after three repeats; caller-owned external calls are excluded | Default limit allows at most 20 internal calls | Over-budget internal runs terminate as failed with `tool_call_limit` | Orchestrator / Resolved | `src/orchestrator/context/limits.py::ExecutionBudget.record_tool_call`; `routes.py::_executeToolCall`; `test_tool_call_budget.py` |
 | G-013 | Evaluator plateau | [PARTIAL] | Engine calls evaluator without score history | Evaluator supports plateau scores | Score-plateau fallback branch is unreachable | Orchestrator / P2 | `ExecutionEvaluator.evaluate(..., previous_scores=None)` at `routes.py:299`; plateau branch `325-328`; static/stream calls at `674`/`793` pass only objective and outputs |
 | G-014 | Streaming | [PARTIAL] | Completed output split by whitespace with delay | Stream contract suggests incremental output | Not provider token streaming | Orchestrator / P1 | `_executeGraphStream` at `routes.py:811-826` chunks completed text and sleeps `0.02s`; dispatcher `stream()` is not called |
 | G-015 | Conversation title | [REMOVED] | No title generator, route, tool, request field, or response field exists | Clients own their conversation store and decide whether to request titles | The orchestrator performs no title work; see D-013 | Client / Resolved | D-013; route/OpenAPI and request/response contract tests |
 | G-016 | Sources | [PARTIAL] | Static source list remains empty; graph does not append | Response supports citations | Sources remain empty absent custom generator | Orchestrator / P1 | `routes.py:604` initializes `sources=[]`; no append in `_executeGraphStatic`; stream graph emits no source event |
 | G-017 | Stream completion records | [PARTIAL] | Stream writes planned checkpoint/audit only | Static path records completed run | Stream outcomes lack completed checkpoint/audit | Orchestrator / P1 | `routes.py:472` planned save/audit; static-only branch at `494-495` writes completed; stream returns at `475-481` |
-| G-018 | Approval enforcement | [NOT PROVIDED] | Approval scaffolding was removed by D-003; no approval gate exists | Orchestrator does not claim to approval-gate tool writes | External side effects require an authoritative core-backend policy if approval is required | Core backend / As needed | D-003; `src/core/security/approvals.py` and approval endpoints are absent |
+| G-018 | Approval enforcement | [NOT PROVIDED] | Approval scaffolding was removed by D-003; no approval gate exists | Orchestrator does not claim to approval-gate tool writes | External side effects require an authoritative core-backend policy if approval is required | Core backend / As needed | D-003; `src/orchestrator/security/approvals.py` and approval endpoints are absent |
 | G-019 | ABAC | [NOT PROVIDED] | ABAC helper was removed by D-003 | Orchestrator does not claim attribute-based authorization | Principal attributes do not affect tool authorization | Core backend / As needed | D-003; no ABAC module or engine call |
 | G-020 | Egress allowlist | [NOT PROVIDED] | General egress helper was removed by D-003; bounded media conversion and public-web search have their own URL checks | Orchestrator does not claim a general outbound-host policy | Deployments must control network egress outside those tool-specific checks | Platform / As needed | D-003; no general egress module |
 | G-021 | Production identity | [RISK] | Responses requires a `Principal` in request state; token verification middleware is outside this package | Authenticated tenant identity expected at the core-backend boundary | Misconfigured upstream integration cannot authenticate Responses calls | Core backend / P0 before HTTP exposure | `responses/http.py`; trusted middleware contract; no identity headers accepted |
 | G-022 | SDK runner | [LIBRARY ONLY] | OpenAI Agents SDK wrapper not invoked by custom engine | SDK agent path exists in source/docs | Two agent execution architectures can drift | Orchestrator / P2 | `src/ochestrator/runner.py` defines SDK wrapper; `routes.py:364-366` creates custom `AgentRegistry` and no runner call occurs in `run()` |
-| G-023 | Checkpoint path and retention | [RESOLVED] | Root/tenant containment, component validation, atomic replacement, and 30-day expiry are enforced | Suspended runs must be safely recoverable | Traversal and unbounded-retention paths are addressed; storage remains plaintext | Orchestrator / Resolved | `src/core/security/durability.py`; `tests/unit/test_checkpoint_containment.py` |
-| G-024 | Default provider wiring | [PARTIAL] | Chat, embeddings, speech, and transcription use lazy local runtimes; image/video generation has no public route | Catalog names imply reachable models | Model weights may be absent and first use may need Hub access | Orchestrator / P1 | `HuggingFaceInference`; `src/api/v1/models/routes.py`; speech dispatcher tests |
+| G-023 | Checkpoint path and retention | [RESOLVED] | Root/tenant containment, component validation, atomic replacement, and 30-day expiry are enforced | Suspended runs must be safely recoverable | Traversal and unbounded-retention paths are addressed; storage remains plaintext | Orchestrator / Resolved | `src/orchestrator/security/durability.py`; `tests/unit/test_checkpoint_containment.py` |
+| G-024 | Default provider wiring | [PARTIAL] | Chat, embeddings, speech, and transcription use lazy local runtimes; image/video generation has no public route | Catalog names imply reachable models | Model weights may be absent and first use may need Hub access | Orchestrator / P1 | `HuggingFaceInference`; `src/orchestrator/api/v1/models/routes.py`; speech dispatcher tests |
 | G-025 | Hugging Face model runtime | [RESOLVED] | Hub snapshots are downloaded locally and loaded using the declared runtime; inference is local | Model parameters and runtime selection must affect local execution | No hosted inference request is made; downloads require network only on cache miss | Orchestrator / Resolved | D-018; local model and no-remote-inference tests |
-| G-026 | App/client cleanup | [PARTIAL] | Lifespan closes cached local model runtimes, speech runtimes, training worker, and media converter | Long-lived ASGI service expected | Injected app-state providers remain caller-owned | Orchestrator / P1 | `src/api/__init__.py`; model provider lifecycle |
+| G-026 | App/client cleanup | [PARTIAL] | Lifespan closes cached local model runtimes, speech runtimes, training worker, and media converter | Long-lived ASGI service expected | Injected app-state providers remain caller-owned | Orchestrator / P1 | `src/orchestrator/api/__init__.py`; model provider lifecycle |
 | G-027 | Errors/cancellation | [PARTIAL] | No top-level error/failure audit/finalizer | Status/error schemas exist | Inconsistent propagated errors; cancellations unrecorded | Orchestrator / P1 | `routes.py:373-511` has no enclosing failure/finally lifecycle; emitted run audit events are only planned/completed at `472`/`495` |
 | G-028 | Concurrency | [RISK] | Per-run state local; shared clients/audit/checkpoint lack complete synchronization | Service expected to handle concurrent requests | Safety is not established for singleton engine | Orchestrator / P1 | `executor.py:70-74` mutates lazy initialization without a lock; `audit.py:31-44` appends without lock; §7 concurrency table lists unverified cases |
-| G-029 | Metrics/tracing | [UNWIRED] | Only return metadata and JSONL audit | Runtime observability expected | No production health, metrics, or distributed trace | Platform/orchestrator / P2 | `api/__init__.py:7-8` mounts no instrumentation; `src/api` has no middleware/exporter; §13 |
+| G-029 | Metrics/tracing | [UNWIRED] | Only return metadata and JSONL audit | Runtime observability expected | No production health, metrics, or distributed trace | Platform/orchestrator / P2 | `api/__init__.py:7-8` mounts no instrumentation; `src/orchestrator/api` has no middleware/exporter; §13 |
 | G-030 | Dependency reproducibility | [RISK] | Requirements use ranges; no project-local environment/lock evidence | Container should build reproducibly | Resolution can drift across builds; project-local reproducibility unassessed | Platform/orchestrator / P2 | `requirements.txt` contains ranges; no project-local `.venv` or lockfile is present; global `pip list --outdated` was excluded as non-project evidence |
-| G-031 | Package spelling | [DEAD / STALE] | `src/ochestrator/` is misspelled and not used by `ForgeEngine.run` or FastAPI | Package name is intended to mean orchestrator | Confusing imports and duplicated execution architecture | Orchestrator / P2 | `src/ochestrator/runner.py` defines SDK wrapper; search of engine and `src/api` finds no import or invocation |
+| G-031 | Package spelling | [DEAD / STALE] | `src/ochestrator/` is misspelled and not used by `ForgeEngine.run` or FastAPI | Package name is intended to mean orchestrator | Confusing imports and duplicated execution architecture | Orchestrator / P2 | `src/ochestrator/runner.py` defines SDK wrapper; search of engine and `src/orchestrator/api` finds no import or invocation |
 | G-032 | Engine class rename compatibility | [RESOLVED] | In-repository consumers now use `ForgeEngine`; serialized state/audit fields contain run IDs and data, not Python class symbols | Previous Python consumers may have imported the old symbol | No in-repository compatibility surface or persisted-format migration required | Orchestrator / Resolved | Repository search finds no old-symbol references; `state.py:50-56` and `audit.py:31-40` serialize data fields only; no external-consumer evidence was found |
 | G-033 | Event ID catalog sync | [RESOLVED] | Tests verify registered Action IDs are valid, unique, and documented, and emitted Thought ID literals are documented | Handler-owned IDs and catalogs must stay synchronized | Catalog drift is caught in the test suite | Orchestrator / Resolved | `tests/unit/test_action_contract.py` |
-| G-034 | Chat Completions training boundary | [RESOLVED] | Forge Text Chat Completions contains no exporter call; integration test asserts no export line | Only opted-in completed Responses runs may be collected | Regression is caught by HTTP test | Orchestrator / Resolved | `tests/integration/test_training_export_toggle.py`; source search of `src/api/v1/chat` |
+| G-034 | Chat Completions training boundary | [RESOLVED] | Forge Text Chat Completions contains no exporter call; integration test asserts no export line | Only opted-in completed Responses runs may be collected | Regression is caught by HTTP test | Orchestrator / Resolved | `tests/integration/test_training_export_toggle.py`; source search of `src/orchestrator/api/v1/chat` |
 | G-035 | Checkpoint deployment protection | [RISK] | Checkpoint files are plaintext and restart recovery requires a persistent mounted root | Deployment must protect sensitive execution state at rest | Ephemeral/unprotected storage can lose or expose suspended runs | Platform/orchestrator / P0 before production | D-004; `FORGE_CHECKPOINT_ROOT`; §11 |
 | G-036 | Uniform tool operation contract | [RESOLVED] | Every default registry schema requires an operation enum and every registered operation has an implementation | D-020/D-021 require an operation field, implemented skill row, and Action ID per registered operation | Schema/skill/catalog drift or placeholders fail unit tests | Orchestrator / Resolved | `test_tool_operations_audit.py`; `test_action_contract.py`; D-020; D-021 |
 | G-037 | Stateful tool ownership | [RESOLVED] | Built-in todo/memory storage and `state_store.py` were removed | Durable tool state belongs to callers or the core backend | Local tools cannot retain task or memory state across requests | Orchestrator / Resolved | D-022; `test_no_stateful_tools.py`; `test_no_persistence_in_tools.py` |
@@ -1165,11 +1187,11 @@ Each row has a status tag. `[RISK]` denotes impact beyond missing feature wiring
 | C-2 — Default engine / Canva Thought IDs | Resolved | D-001 removes registry-level IDs; default engine constructs without Thought-ID metadata |
 | C-3 — Stream title key mismatch | Confirmed | Collector reads `chunk` at `routes.py:552`; graph emits `content` at `routes.py:824` |
 | C-4 — Static source collection | Confirmed | Static graph initializes `sources` at `routes.py:604` and never appends; only the stream wrapper has a source append, and graph emits none |
-| C-5 — Tool-call budget | Confirmed | `record_tool_call` is defined at `src/context/limits.py:59`; no engine call site |
+| C-5 — Tool-call budget | Confirmed | `record_tool_call` is defined at `src/orchestrator/context/limits.py:59`; no engine call site |
 | C-6 — Stream terminal persistence/audit | Confirmed | Planned save at `routes.py:471`; only static branch saves `completed`/records `run.completed` at `routes.py:494-495` |
 | C-7 — Empty route modules | Confirmed | Chat completions, embeddings and models route files measured at 0 bytes; no route definitions |
 | C-8 — Engine option signature | Confirmed | `ForgeEngine.run` signature at `routes.py:373` omits mode, forcedModality, idempotencyKey and metadata |
-| C-9 — History field bound | Confirmed | `HistoryMessage.content` at `src/core/schemas/input.py:55` declares `max_length=8000` |
+| C-9 — History field bound | Confirmed | `HistoryMessage.content` at `src/orchestrator/schemas/input.py:55` declares `max_length=8000` |
 | C-10 — Test result | Historical baseline | Round 3 `63 passed`; post-Round-4/5 results are recorded below |
 | C-11 — Pytest isolation | Confirmed | `pyproject.toml` pins `testpaths = ["tests"]`; `conftest.py` content and direct import path are reproduced in §14 |
 | C-12 — Route contract | Removed | The 501 route and `tests/unit/test_orchestrate_route.py` were deleted by explicit decision |

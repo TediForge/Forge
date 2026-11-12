@@ -1,4 +1,4 @@
-from src.export.huggingface import HuggingFaceSync
+from orchestrator.export.huggingface import HuggingFaceSync
 
 
 def test_push_uploads_or_replaces_local_daily_file():

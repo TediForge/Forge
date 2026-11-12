@@ -1,6 +1,6 @@
 import unittest
 
-from src.context.idempotency import IdempotencyStore
+from orchestrator.context.idempotency import IdempotencyStore
 
 
 class IdempotencyStoreTests(unittest.TestCase):

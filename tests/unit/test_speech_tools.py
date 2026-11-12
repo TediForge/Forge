@@ -4,13 +4,14 @@ import sys
 import wave
 from types import SimpleNamespace
 
-from src.core.models.adapters.base import DispatcherError
-from src.core.models.adapters.stt import SttDispatcher
-from src.core.models.adapters.voice import VoiceDispatcher
-from src.core.models.huggingface import HuggingFaceInference
-from src.tools.definitions import speak, transcribe
-from src.tools.executor import ToolExecutor
-from src.tools.registry import create_default_registry
+from orchestrator.inference.modalities.base import DispatcherError
+from orchestrator.inference.modalities.stt import SttDispatcher
+from orchestrator.inference.modalities.voice import VoiceDispatcher
+from orchestrator.inference.backends.local import HuggingFaceInference
+from orchestrator.inference.gateway import InferenceGateway
+from orchestrator.tools.definitions import speak, transcribe
+from orchestrator.tools.executor import ToolExecutor
+from orchestrator.tools.registry import create_default_registry
 
 
 def test_speech_tools_are_registered_with_one_image_and_video_schema():
@@ -181,7 +182,7 @@ def test_voice_dispatcher_returns_piper_wav_bytes():
     assert result == b"piper output"
 
 
-def test_voice_dispatcher_loads_local_piper_model_and_returns_pcm(monkeypatch, tmp_path):
+def test_voice_dispatcher_loads_local_piper_model_through_gateway(monkeypatch, tmp_path):
     modelPath = tmp_path / "voice.onnx"
     modelPath.write_bytes(b"model")
     observed = {}
@@ -203,13 +204,25 @@ def test_voice_dispatcher_loads_local_piper_model_and_returns_pcm(monkeypatch, t
         def __init__(self, length_scale):
             self.length_scale = length_scale
 
-    monkeypatch.setattr(HuggingFaceInference, "_localPath", lambda self: modelPath)
     monkeypatch.setitem(
         sys.modules,
         "piper",
         SimpleNamespace(PiperVoice=PiperVoice, SynthesisConfig=SynthesisConfig),
     )
-    result = asyncio.run(VoiceDispatcher().synthesize("hello", format="pcm", speed=2.0))
+
+    class LocalSource:
+        async def resolve(self, locator):
+            return modelPath
+
+    async def synthesize():
+        gateway = InferenceGateway(source_factory=lambda entry: LocalSource())
+        try:
+            dispatcher = VoiceDispatcher(gateway.get("audio"))
+            return await dispatcher.synthesize("hello", format="pcm", speed=2.0)
+        finally:
+            await gateway.close()
+
+    result = asyncio.run(synthesize())
     assert result == b"\x01\x00\x02\x00"
     assert observed == {
         "model": (str(modelPath), False),

@@ -7,9 +7,9 @@ from types import SimpleNamespace
 
 import pytest
 
-from src.context.state import ExecutionState
-from src.core.attachments import AttachmentDispatcherRouter
-from src.core.schemas.input import AttachmentPayload
+from orchestrator.context.state import ExecutionState
+from orchestrator.attachments import AttachmentDispatcherRouter
+from orchestrator.schemas.v1.responses import AttachmentPayload
 
 
 PNG_DATA = "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+jO7sAAAAASUVORK5CYII="
@@ -81,7 +81,7 @@ def test_attachment_rejects_urls_and_invalid_base64():
 
 
 def test_history_attachments_require_inline_bytes():
-    from src.core.schemas.input import HistoryMessage
+    from orchestrator.schemas.v1.responses import HistoryMessage
 
     with pytest.raises(ValueError, match="Extra inputs are not permitted"):
         HistoryMessage.model_validate({
@@ -97,8 +97,8 @@ def test_history_attachments_require_inline_bytes():
 
 
 def test_attachment_validation_does_not_run_before_authorization():
-    from src.api.v1.responses.routes import ForgeEngine
-    from src.core.security.identity import IdentityContextError
+    from orchestrator.engine.engine import ForgeEngine
+    from orchestrator.security.identity import IdentityContextError
 
     engine = ForgeEngine()
     with pytest.raises(IdentityContextError):
@@ -111,7 +111,7 @@ def test_attachment_validation_does_not_run_before_authorization():
 
 
 def test_classifier_and_refiner_receive_extracted_attachment_content():
-    from src.api.v1.responses.routes import IntentClassifier, IntentResult, PromptRefiner, RefinedPrompt
+    from orchestrator.engine.engine import IntentClassifier, IntentResult, PromptRefiner, RefinedPrompt
 
     prompts = []
 
@@ -166,14 +166,14 @@ def test_attachment_content_is_excluded_from_checkpoint_json():
 
 
 def test_online_image_reaches_vision_as_base64_without_persisting_media(monkeypatch):
-    from src.api.v1.responses.routes import (
+    from orchestrator.engine.engine import (
         ExecutionPlan,
         ExecutionStep,
         ForgeEngine,
         IntentResult,
         RefinedPrompt,
     )
-    from src.core.security.identity import Principal
+    from orchestrator.security.identity import Principal
 
     raw = base64.b64decode(PNG_DATA)
     observed = {}
@@ -204,27 +204,36 @@ def test_online_image_reaches_vision_as_base64_without_persisting_media(monkeypa
         audit_log=Audit(),
         checkpoint_store=Checkpoints(),
     )
-    engine.intentClassifier = SimpleNamespace(classify=lambda **kwargs: IntentResult(
-        reasoning="Image question",
-        modalities_involved=["vision"],
-        primary_capability="visionInspection",
-        extracted_prompt="Describe the image",
-    ))
-    engine.promptRefiner = SimpleNamespace(refine=lambda prompt, intent, attachments, **kwargs: RefinedPrompt(
-        original_prompt=prompt,
-        refined_prompt="Describe the image",
-        objective="Describe the image",
-        modality_profile="vision",
-    ))
-    engine.executionPlanner = SimpleNamespace(create_plan=lambda **kwargs: ExecutionPlan(
-        reasoning="Inspect the attached image",
-        steps=[ExecutionStep(
-            step_id=1,
-            modality="vision",
-            capability="visionInspection",
-            task_instruction="Describe the image",
-        )],
-    ))
+    async def classify_async(**kwargs):
+        return IntentResult(
+            reasoning="Image question",
+            modalities_involved=["vision"],
+            primary_capability="visionInspection",
+            extracted_prompt="Describe the image",
+        )
+
+    async def refine_async(prompt, intent, attachments, **kwargs):
+        return RefinedPrompt(
+            original_prompt=prompt,
+            refined_prompt="Describe the image",
+            objective="Describe the image",
+            modality_profile="vision",
+        )
+
+    async def create_plan_async(**kwargs):
+        return ExecutionPlan(
+            reasoning="Inspect the attached image",
+            steps=[ExecutionStep(
+                step_id=1,
+                modality="vision",
+                capability="visionInspection",
+                task_instruction="Describe the image",
+            )],
+        )
+
+    engine.intentClassifier = SimpleNamespace(classify_async=classify_async)
+    engine.promptRefiner = SimpleNamespace(refine_async=refine_async)
+    engine.executionPlanner = SimpleNamespace(create_plan_async=create_plan_async)
     attachment = AttachmentPayload(
         fileId="file-1",
         fileName="pixel.png",
@@ -252,8 +261,8 @@ def test_online_image_reaches_vision_as_base64_without_persisting_media(monkeypa
 
 
 def test_vision_image_requires_multimodal_dispatcher():
-    from src.agents.base import AgentExecutionError
-    from src.agents.vision.agent import VisionAgent
+    from orchestrator.agents.base import AgentExecutionError
+    from orchestrator.agents.vision.agent import VisionAgent
 
     state = ExecutionState("run-vision", {
         "inlineAttachments": [{

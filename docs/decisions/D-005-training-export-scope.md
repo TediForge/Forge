@@ -1,4 +1,9 @@
-# D-005: Training Export Is Per-Request and Responses-Only
+# D-005: Trajectory Export Is Opt-In and Responses-Only
+
+> **Partially superseded by [D-025](./D-025-response-effort-suggestions-trajectories.md):** the
+> former training-export terminology and prompt/response-only format are
+> superseded by a bounded, versioned, redacted trajectory contract. The
+> explicit-consent and completed autonomous-run boundary remains in force.
 
 - **Status:** Accepted
 - **Date:** 2026-11-09
@@ -7,7 +12,7 @@
 
 ## Context
 
-Training JSONL export is an optional observability side channel. The
+Trajectory JSONL export is an optional evaluation side channel. The
 Chat Completions endpoint was a provider passthrough when this decision was
 written; it is now served by the registered Forge Text model. `/v1/responses`
 remains the orchestrator-owned prompt-to-synthesis flow. Exporting every
@@ -16,8 +21,8 @@ explicit request from the caller.
 
 ## Decision
 
-Export only when both `FORGE_TRAINING_EXPORT_ENABLED=true` and the individual
-`/v1/responses` request sets `metadata.trainingExport=true`. The Forge-backed Chat
+Export only when both `FORGE_TRAJECTORY_EXPORT_ENABLED=true` and the individual
+`/v1/responses` request sets `trajectoryExport=true`. The Forge-backed Chat
 Completions route never calls the exporter. If export is requested while
 disabled server-side, reject the request rather than silently ignoring it.
 
@@ -26,11 +31,13 @@ derived internally from the presence of caller-owned tools. Training export
 is rejected for interactive runs because no complete prompt-to-final-response
 pair exists until a later request.
 
-Only successful completed autonomous Responses runs are exported. The
-orchestrator writes caller-visible prompt/response pairs in OpenAI JSONL
-format, does not curate them, and keeps export off by default. Optional
-Hugging Face synchronization is one-way; local files remain the source of
-truth and upload failure does not fail a run.
+Only successful completed autonomous Responses runs are exported. Records
+include a schema version, purpose, run identifier, messages, steps, tool calls,
+outcome, and metadata. Common credentials, emails, and phone numbers are
+redacted, and records exceeding the configured size limit are dropped.
+Export remains off by default. Optional Hugging Face synchronization is
+one-way; local files remain the source of truth and upload failure does not
+fail a run. This data handoff does not train a model.
 
 ## Consequences
 

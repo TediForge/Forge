@@ -55,7 +55,7 @@ history.
 - [Provider/tool boundary](./references/provider-vs-tool.md)
 - [Thought IDs](./references/thought-ids.md)
 - [Action IDs](./references/action-ids.md)
-- [Optional training export implementation](../src/export/)
+- [Optional trajectory export implementation](../src/orchestrator/export/)
 
 ## Decisions
 
@@ -63,7 +63,7 @@ history.
 - [D-002: Separate Thoughts from Actions](./decisions/D-002-separate-thoughts-from-actions.md)
 - [D-003: Remove unwired policy scaffolding](./decisions/D-003-remove-unwired-policy-scaffolding.md)
 - [D-004: External tools use two-phase resume](./decisions/D-004-external-tools-two-phase-resume.md)
-- [D-005: Training export is per-request and Responses-only](./decisions/D-005-training-export-scope.md)
+- [D-005: Trajectory export is opt-in and Responses-only](./decisions/D-005-training-export-scope.md)
 - [D-006: CamelCase wire contract and central tool validation](./decisions/D-006-wire-camelcase-and-validation.md)
 - [D-007: Ordered content blocks and event timeline](./decisions/D-007-ordered-content-and-events.md)
 - [D-008: Base64-inline media contract](./decisions/D-008-base64-inline-media.md)
@@ -78,6 +78,8 @@ history.
 - [D-021: No registered placeholder operations](./decisions/D-021-no-registered-placeholder-operations.md)
 - [D-022: No stateful tools](./decisions/D-022-no-stateful-tools.md)
 - [D-023: Keep non-model integrations in their tool modules](./decisions/D-023-tool-local-non-model-integrations.md)
+- [D-024: Inference is multi-backend and multi-source](./decisions/D-024-multisource-inference-gateway.md)
+- [D-025: One reasoning control, optional suggestions, and bounded trajectories](./decisions/D-025-response-effort-suggestions-trajectories.md)
 
 ## Research
 

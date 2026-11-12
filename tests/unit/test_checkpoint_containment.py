@@ -3,7 +3,7 @@ import time
 
 import pytest
 
-from src.core.security.durability import CheckpointStore
+from orchestrator.security.durability import CheckpointStore
 
 
 def test_checkpoint_store_rejects_traversal_components(tmp_path):

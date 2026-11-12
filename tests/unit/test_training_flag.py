@@ -2,10 +2,10 @@ import asyncio
 
 import pytest
 
-from src.api.v1.responses.routes import ForgeEngine, IntentResult, RefinedPrompt
-from src.core.schemas.input import ExternalToolDefinition
-from src.core.security.audit import AuditLog
-from src.core.security.durability import CheckpointStore
+from orchestrator.engine.engine import ForgeEngine, IntentResult, RefinedPrompt
+from orchestrator.schemas.v1.responses import ExternalToolDefinition
+from orchestrator.security.audit import AuditLog
+from orchestrator.security.durability import CheckpointStore
 
 
 class DirectDispatcher:
@@ -41,7 +41,7 @@ def _engine(tmp_path):
 
 
 def _principal():
-    from src.core.security.identity import Principal
+    from orchestrator.security.identity import Principal
 
     return Principal("user-1", "tenant-a", roles=("operator",))
 
@@ -62,13 +62,13 @@ async def _run_and_shutdown(engine, **kwargs):
         principal=_principal(),
         **kwargs,
     )
-    await engine.trainingExporter.shutdown()
+    await engine.trajectoryExporter.shutdown()
     return response
 
 
 def test_training_export_is_per_request_opt_in(tmp_path, monkeypatch):
-    monkeypatch.setenv("FORGE_TRAINING_EXPORT_ENABLED", "true")
-    monkeypatch.setenv("FORGE_TRAINING_EXPORT_DIR", str(tmp_path / "exports"))
+    monkeypatch.setenv("FORGE_TRAJECTORY_EXPORT_ENABLED", "true")
+    monkeypatch.setenv("FORGE_TRAJECTORY_EXPORT_DIR", str(tmp_path / "exports"))
     engine = _engine(tmp_path)
     response = asyncio.run(_run_and_shutdown(engine))
     assert response.status == "completed"
@@ -77,37 +77,37 @@ def test_training_export_is_per_request_opt_in(tmp_path, monkeypatch):
 
 def test_opted_in_completed_autonomous_run_is_exported(tmp_path, monkeypatch):
     export_dir = tmp_path / "exports"
-    monkeypatch.setenv("FORGE_TRAINING_EXPORT_ENABLED", "true")
-    monkeypatch.setenv("FORGE_TRAINING_EXPORT_DIR", str(export_dir))
+    monkeypatch.setenv("FORGE_TRAJECTORY_EXPORT_ENABLED", "true")
+    monkeypatch.setenv("FORGE_TRAJECTORY_EXPORT_DIR", str(export_dir))
     engine = _engine(tmp_path)
-    response = asyncio.run(_run_and_shutdown(engine, training_export=True))
+    response = asyncio.run(_run_and_shutdown(engine, trajectory_export=True))
     assert response.status == "completed"
     assert len(list(export_dir.glob("*.jsonl"))) == 1
 
 
 def test_export_request_is_rejected_when_server_disabled(tmp_path, monkeypatch):
-    monkeypatch.setenv("FORGE_TRAINING_EXPORT_ENABLED", "false")
+    monkeypatch.setenv("FORGE_TRAJECTORY_EXPORT_ENABLED", "false")
     engine = _engine(tmp_path)
-    with pytest.raises(ValueError, match="trainingExport requested but training export is disabled server-side"):
-        _run(engine, training_export=True)
+    with pytest.raises(ValueError, match="trajectoryExport requested but trajectory export is disabled server-side"):
+        _run(engine, trajectory_export=True)
 
 
 def test_interactive_training_export_is_rejected_even_with_external_tools(tmp_path, monkeypatch):
-    monkeypatch.setenv("FORGE_TRAINING_EXPORT_ENABLED", "true")
+    monkeypatch.setenv("FORGE_TRAJECTORY_EXPORT_ENABLED", "true")
     engine = _engine(tmp_path)
     external = [ExternalToolDefinition(name="getweather", description="Get weather")]
     with pytest.raises(ValueError, match="not supported for interactive runs"):
         _run(
             engine,
-            training_export=True,
+            trajectory_export=True,
             external_tools=external,
         )
 
 
 def test_failed_run_is_not_exported(tmp_path, monkeypatch):
     export_dir = tmp_path / "exports"
-    monkeypatch.setenv("FORGE_TRAINING_EXPORT_ENABLED", "true")
-    monkeypatch.setenv("FORGE_TRAINING_EXPORT_DIR", str(export_dir))
+    monkeypatch.setenv("FORGE_TRAJECTORY_EXPORT_ENABLED", "true")
+    monkeypatch.setenv("FORGE_TRAJECTORY_EXPORT_DIR", str(export_dir))
     engine = _engine(tmp_path)
 
     async def failed_graph(plan, state, budget):
@@ -116,6 +116,6 @@ def test_failed_run_is_not_exported(tmp_path, monkeypatch):
         return "", [], [], [], []
 
     engine._executeGraphStatic = failed_graph
-    response = asyncio.run(_run_and_shutdown(engine, training_export=True))
+    response = asyncio.run(_run_and_shutdown(engine, trajectory_export=True))
     assert response.status == "failed"
     assert not list(export_dir.glob("*.jsonl"))

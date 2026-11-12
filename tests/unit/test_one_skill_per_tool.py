@@ -1,10 +1,10 @@
 import re
 from pathlib import Path
 
-from src.tools.registry import create_default_registry
+from orchestrator.tools.registry import create_default_registry
 
 
-SKILLS = Path(__file__).resolve().parents[2] / "src" / "skills" / "tools"
+SKILLS = Path(__file__).resolve().parents[2] / "src" / "orchestrator" / "skills" / "tools"
 
 
 def test_one_skill_per_registered_tool():

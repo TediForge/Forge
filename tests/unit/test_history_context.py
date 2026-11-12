@@ -1,5 +1,5 @@
-from src.context.session import SessionManager
-from src.context.state import ExecutionState
+from orchestrator.context.session import SessionManager
+from orchestrator.context.state import ExecutionState
 
 
 def test_history_prompt_includes_recent_turns_with_caps():

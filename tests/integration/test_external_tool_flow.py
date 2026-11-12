@@ -3,11 +3,11 @@ import re
 
 import httpx
 
-from src.api import app
-from src.api.v1.responses.routes import ExecutionPlan, ForgeEngine, IntentResult, RefinedPrompt
-from src.core.security.audit import AuditLog
-from src.core.security.durability import CheckpointStore
-from src.core.security.identity import Principal
+from orchestrator.api import app
+from orchestrator.engine.engine import ExecutionPlan, ForgeEngine, IntentResult, RefinedPrompt
+from orchestrator.security.audit import AuditLog
+from orchestrator.security.durability import CheckpointStore
+from orchestrator.security.identity import Principal
 
 
 class ExternalToolDispatcher:

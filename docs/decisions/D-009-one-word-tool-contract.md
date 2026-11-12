@@ -9,7 +9,7 @@
 - **Status:** Accepted
 - **Date:** 2026-11-09
 - **Owner:** Orchestrator
-- **Related:** [Orchestrator Runtime §9](../architecture/orchestrator-runtime.md), [Tool skills](../../src/skills/tools/)
+- **Related:** [Orchestrator Runtime §9](../architecture/orchestrator-runtime.md), [Tool skills](../../src/orchestrator/skills/tools/)
 
 ## Context
 
@@ -24,11 +24,11 @@ Every registered tool name MUST match `^[a-z][a-z0-9]*$`. Names describe the
 action, not the service. Renames have no compatibility aliases. Tools that
 offer multiple operations use one public name with an `operation` argument.
 
-Every registered tool MUST have a `src/skills/tools/<name>/SKILL.md` file. Its YAML
+Every registered tool MUST have a `src/orchestrator/skills/tools/<name>/SKILL.md` file. Its YAML
 frontmatter declares the matching name, a nonempty trigger description, and
 `category: tool`; its body explains when to use and not use the tool, how to
 call it, output expectations, and edge cases. Agent and general skills are
-categorized under `src/skills/agents/` and `src/skills/general/` respectively.
+categorized under `src/orchestrator/skills/agents/` and `src/orchestrator/skills/general/` respectively.
 
 The registry validates both tool-name syntax and the associated tool skill
 before accepting registration. CI tests assert the rule over the assembled

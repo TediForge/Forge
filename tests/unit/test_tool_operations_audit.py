@@ -3,11 +3,11 @@ from pathlib import Path
 
 import pytest
 
-from src.tools.executor import ToolExecutor
-from src.tools.registry import create_default_registry
+from orchestrator.tools.executor import ToolExecutor
+from orchestrator.tools.registry import create_default_registry
 
 
-SKILLS = Path(__file__).resolve().parents[2] / "src" / "skills" / "tools"
+SKILLS = Path(__file__).resolve().parents[2] / "src" / "orchestrator" / "skills" / "tools"
 
 
 def _documented_operations(tool_name: str) -> set[str]:

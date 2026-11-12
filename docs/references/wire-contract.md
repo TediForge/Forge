@@ -11,8 +11,11 @@ The deliberate snake_case fields are `call_id` on function calls and
 The orchestrator request accepts caller-provided function schemas in `tools`,
 execution effort in `reasoning.effort`, and resume results as
 `function_call_output` items inside `messages`. It does not accept a client
-session ID, topology, or separate function-output list. Training export is an
-opt-in boolean at `metadata.trainingExport`.
+session ID, topology, or separate function-output list. `trajectoryExport` is
+an opt-in boolean that requests a redacted, versioned trajectory record when
+server-side export is enabled. `includeSuggestions` opts in to optional
+follow-up prompts; `suggestions` are returned only on the final completed
+response and are empty when unavailable or inapplicable.
 
 ## Audio
 

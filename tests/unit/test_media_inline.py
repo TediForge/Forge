@@ -4,9 +4,8 @@ import socket
 
 import pytest
 
-from src.core.models.adapters.media import MediaConversionError, MediaConverter
-from src.core.schemas.input import ResponsesInputContent
-from src.core.schemas.output import ContentBlock
+from orchestrator.media import MediaConversionError, MediaConverter
+from orchestrator.schemas.v1.responses import ContentBlock, ResponsesInputContent
 
 
 PNG_DATA = "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+jO7sAAAAASUVORK5CYII="

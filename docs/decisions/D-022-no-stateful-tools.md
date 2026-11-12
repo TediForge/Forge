@@ -8,7 +8,7 @@
 ## Context
 
 The built-in `todo` and `memory` tools wrote cross-request state to
-`src/tools/state_store.py`, a local SQLite database. This made a tool
+`src/orchestrator/tools/state_store.py`, a local SQLite database. This made a tool
 responsible for persistence, retention, tenant isolation, and database
 lifecycle that belong to the caller or core backend, not the orchestrator.
 An in-process cache is not an adequate replacement: tasks and memories are
@@ -24,7 +24,7 @@ behavior.
 
 **No built-in tool may persist state across requests.**
 
-- `src/tools/state_store.py`, the `todo` and `memory` tool modules, and their
+- `src/orchestrator/tools/state_store.py`, the `todo` and `memory` tool modules, and their
   skills are removed. Their Action IDs are retired and must not be reused.
 - No replacement in-process cache is provided for these capabilities.
 - A future tool requiring state across requests must be supplied by the

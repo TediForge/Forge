@@ -1,7 +1,7 @@
 import re
 from pathlib import Path
 
-from src.tools.registry import create_default_registry
+from orchestrator.tools.registry import create_default_registry
 
 
 def _operations_for(definition: dict) -> list[str]:
@@ -70,7 +70,7 @@ def test_every_operation_has_action_id():
 
 
 def test_no_not_implemented_in_handlers():
-    definitions = Path(__file__).parents[2] / "src" / "tools" / "definitions"
+    definitions = Path(__file__).parents[2] / "src" / "orchestrator" / "tools" / "definitions"
     for source in definitions.glob("*.py"):
         assert "NOT_IMPLEMENTED" not in source.read_text(encoding="utf-8"), source
 

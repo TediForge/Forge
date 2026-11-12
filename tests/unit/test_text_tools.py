@@ -1,5 +1,5 @@
-from src.tools.definitions.extract import extract
-from src.tools.definitions.summarize import summarize
+from orchestrator.tools.definitions.extract import extract
+from orchestrator.tools.definitions.summarize import summarize
 
 
 def test_extract_returns_first_schema_matching_json_value():

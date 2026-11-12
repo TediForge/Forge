@@ -2,8 +2,8 @@ import asyncio
 
 import pytest
 
-from src.context.limits import ExecutionBudget, ExecutionLimitError, ExecutionLimits
-from src.core.security.durability import CheckpointStore
+from orchestrator.context.limits import ExecutionBudget, ExecutionLimitError, ExecutionLimits
+from orchestrator.security.durability import CheckpointStore
 
 
 def test_tool_call_count_limit_and_duplicate_fingerprint():
@@ -21,9 +21,9 @@ def test_tool_call_count_limit_and_duplicate_fingerprint():
 
 
 def test_external_function_suspension_does_not_consume_internal_budget(tmp_path):
-    from src.api.v1.responses.routes import ForgeEngine, SuspensionSignal
-    from src.context.state import ExecutionState
-    from src.core.security.audit import AuditLog
+    from orchestrator.engine.engine import ForgeEngine, SuspensionSignal
+    from orchestrator.context.state import ExecutionState
+    from orchestrator.security.audit import AuditLog
 
     engine = ForgeEngine(
         audit_log=AuditLog(tmp_path / "audit.jsonl"),
@@ -46,9 +46,9 @@ def test_external_function_suspension_does_not_consume_internal_budget(tmp_path)
 
 
 def test_tool_budget_breach_fails_run_and_writes_audit(tmp_path):
-    from src.api.v1.responses.routes import ExecutionPlan, ExecutionStep, ForgeEngine
-    from src.context.state import ExecutionState
-    from src.core.security.audit import AuditLog
+    from orchestrator.engine.engine import ExecutionPlan, ExecutionStep, ForgeEngine
+    from orchestrator.context.state import ExecutionState
+    from orchestrator.security.audit import AuditLog
 
     class Registry:
         def names(self):
