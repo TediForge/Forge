@@ -45,6 +45,9 @@ contracts and Thought/Action IDs. Keep one topic per file, date decisions and
 research, link instead of duplicating, and do not delete decision or research
 history.
 
+The [development guide](./guides/development.md) documents CI schema checks,
+OpenAPI regeneration, and local inference benchmarking.
+
 ## Existing references
 
 - [OpenAPI document](./openapi.json)

@@ -389,6 +389,8 @@ python -m pytest
 ```
 
 Pytest is configured to collect tests only from `tests/`.
+For OpenAPI schema updates and local inference benchmarks, see the
+[development guide](docs/guides/development.md).
 
 ## Contributing
 

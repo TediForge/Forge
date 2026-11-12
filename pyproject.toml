@@ -53,7 +53,7 @@ include = ["orchestrator*"]
 "orchestrator.sandbox" = ["policy.json"]
 
 [tool.pytest.ini_options]
-testpaths = ["tests"]
+testpaths = ["tests", "src/orchestrator/rl"]
 pythonpath = ["src", "tests"]
 
 [tool.pyright]

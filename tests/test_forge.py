@@ -116,10 +116,10 @@ class ForgeProductionTests(unittest.TestCase):
                 )
                 principal = Principal("user-1", "tenant-concurrent", roles=("operator",))
                 try:
-                    responses = await asyncio.gather(
-                        engine.run("first request", principal=principal),
-                        engine.run("second request", principal=principal),
-                    )
+                    responses = await asyncio.gather(*(
+                        engine.run(f"concurrent request {index}", principal=principal)
+                        for index in range(5)
+                    ))
                     run_ids = {response.runId for response in responses}
                     completed = list((root / "checkpoints" / principal.tenant_id).glob("*.completed.json"))
                     entries = [
@@ -131,11 +131,11 @@ class ForgeProductionTests(unittest.TestCase):
                     await engine.close()
 
         run_ids, completed, entries, metrics = asyncio.run(run())
-        self.assertEqual(len(run_ids), 2)
+        self.assertEqual(len(run_ids), 5)
         self.assertEqual({path.name.split(".")[0] for path in completed}, run_ids)
-        self.assertEqual(sum(entry["event"] == "run.completed" for entry in entries), 2)
-        self.assertEqual(sum(entry["event"] == "run.planned" for entry in entries), 2)
-        self.assertIn('forge_runs_total{status="completed"} 2', metrics)
+        self.assertEqual(sum(entry["event"] == "run.completed" for entry in entries), 5)
+        self.assertEqual(sum(entry["event"] == "run.planned" for entry in entries), 5)
+        self.assertIn('forge_runs_total{status="completed"} 5', metrics)
 
     def test_agent_messages_and_scratchpad(self):
         async def run():

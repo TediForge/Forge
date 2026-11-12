@@ -5,6 +5,48 @@
     "version": "1.0.0"
   },
   "paths": {
+    "/health": {
+      "get": {
+        "summary": "Health",
+        "operationId": "health_health_get",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": {
+                    "type": "string"
+                  },
+                  "type": "object",
+                  "title": "Response Health Health Get"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/ready": {
+      "get": {
+        "summary": "Readiness",
+        "operationId": "readiness_ready_get",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": true,
+                  "type": "object",
+                  "title": "Response Readiness Ready Get"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/v1/responses": {
       "post": {
         "summary": "Create Response",
@@ -792,6 +834,34 @@
         ],
         "title": "ExternalToolDefinition"
       },
+      "FollowUpSuggestion": {
+        "properties": {
+          "prompt": {
+            "type": "string",
+            "maxLength": 500,
+            "minLength": 1,
+            "title": "Prompt",
+            "description": "Full text sent as the next user message when the chip is activated"
+          },
+          "title": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 80
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Title"
+          }
+        },
+        "type": "object",
+        "required": [
+          "prompt"
+        ],
+        "title": "FollowUpSuggestion"
+      },
       "FunctionCall": {
         "properties": {
           "type": {
@@ -996,6 +1066,16 @@
             },
             "type": "array",
             "title": "Tools"
+          },
+          "includeSuggestions": {
+            "type": "boolean",
+            "title": "Includesuggestions",
+            "default": false
+          },
+          "trajectoryExport": {
+            "type": "boolean",
+            "title": "Trajectoryexport",
+            "default": false
           },
           "previous_response_id": {
             "anyOf": [
@@ -1328,6 +1408,14 @@
             },
             "type": "array",
             "title": "Sources"
+          },
+          "suggestions": {
+            "items": {
+              "$ref": "#/components/schemas/FollowUpSuggestion"
+            },
+            "type": "array",
+            "maxItems": 4,
+            "title": "Suggestions"
           },
           "metadata": {
             "additionalProperties": true,

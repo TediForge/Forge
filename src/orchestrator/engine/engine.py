@@ -1938,6 +1938,7 @@ class ForgeEngine:
                 stepInstruction = f"{stepInstruction}\n\n{promptContext}"
             try:
                 if step.modality == "text":
+                    agent_message_start = len(state.getVariable("agentMessages", []))
                     if agent is not None:
                         chunkGenerator = agent.stream(stepInstruction, state, step.step_id)
                     else:
@@ -1966,6 +1967,27 @@ class ForgeEngine:
                         closeStream = getattr(chunkGenerator, "aclose", None)
                         if callable(closeStream):
                             await closeStream()
+                    if agent is not None:
+                        handoff_results = await asyncio.wait_for(
+                            self.agentRegistry.execute_handoffs(
+                                agent,
+                                state,
+                                agent_message_start,
+                                step.step_id,
+                            ),
+                            timeout=max(0.001, budget.limits.max_runtime_seconds),
+                        )
+                        for handoff_result in handoff_results:
+                            handoff_chunk = "\n\n" + handoff_result
+                            filtered_chunk = self.outputPolicy(
+                                handoff_chunk,
+                                self._principalFromState(state),
+                            )
+                            if not isinstance(filtered_chunk, str):
+                                raise RuntimeError("Output policy returned a non-text stream chunk")
+                            streamedParts.append(filtered_chunk)
+                            if filtered_chunk:
+                                yield {"type": "textChunk", "data": {"content": filtered_chunk}}
                     stepResult = "".join(streamedParts).strip()
                 elif agent is not None:
                     stepResult = await asyncio.wait_for(self.agentRegistry.collaborate(
