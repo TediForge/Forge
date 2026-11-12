@@ -32,7 +32,7 @@ python -m venv .venv
 .\.venv\Scripts\Activate.ps1
 python -m pip install -r requirements.txt
 Copy-Item .env.example .env
-python -m pip install pytest
+python -m pip install ".[test]"
 python -m pytest
 ```
 

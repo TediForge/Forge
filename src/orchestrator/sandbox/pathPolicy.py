@@ -48,7 +48,7 @@ def safePath(path: str, mode: str = "read", *, isDirectory: bool = False) -> Pat
 	if not workspaceRoots:
 		raise SandboxPathError("Sandbox workspace root is not configured")
 
-	supplied = Path(path).expanduser()
+	supplied = Path(path.replace("\\", "/")).expanduser()
 	candidate = supplied if supplied.is_absolute() else workspaceRoots[0] / supplied
 	resolved = candidate.resolve(strict=False)
 	allowedRoots = writeRoots if mode == "write" else workspaceRoots
