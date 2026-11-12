@@ -15,18 +15,15 @@ InferenceGateway ──► registry ──► source ──► backend
         ▲                               Hub / local path / artifact store
         │                               Transformers / modality runtimes
         └── stable requests, metrics, limits, lifecycle
-
-Offline evaluation / future post-training
-        └── orchestrator.rl ──► versioned policy artifact ──► inference source
 ```
 
 Engine and tool inference calls use the gateway or modality facades. Hugging
 Face Hub access is isolated to `inference/sources/`; model execution belongs
 to `inference/backends/`. The app lifespan owns and closes one gateway.
 Responses schemas are grouped under `schemas/v1/responses/`. Trajectory export
-is opt-in, versioned, redacted, and bounded; the RL package is an offline-only
-scaffold and is not imported by serving code. See [D-024](../decisions/D-024-multisource-inference-gateway.md)
-and [D-025](../decisions/D-025-response-effort-suggestions-trajectories.md).
+is opt-in, versioned, redacted, and bounded. See
+[D-024](../decisions/D-024-multisource-inference-gateway.md) and
+[D-025](../decisions/D-025-response-effort-suggestions-trajectories.md).
 
 ## Table of contents
 

@@ -1,1 +1,0 @@
-{"schemaVersion":"1.0","exampleId":"offline-eval-001","prompt":"Summarize the purpose of an offline evaluation fixture.","chosen":"This fixture provides a sample preference pair for future offline evaluation.","rejected":"This fixture triggers online training during request handling."}

@@ -52,11 +52,10 @@ include = ["orchestrator*"]
 
 [tool.setuptools.package-data]
 "orchestrator.skills" = ["**/*.md"]
-"orchestrator.rl" = ["fixtures/*.jsonl"]
 "orchestrator.sandbox" = ["policy.json"]
 
 [tool.pytest.ini_options]
-testpaths = ["tests", "src/orchestrator/rl"]
+testpaths = ["tests"]
 pythonpath = ["src", "tests"]
 
 [tool.pyright]

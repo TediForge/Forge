@@ -9,8 +9,7 @@
 
 Inference is a serving product surface, not a Hugging Face model wrapper.
 Model identity and capabilities, artifact acquisition, runtime execution, and
-the API used by serving code have different responsibilities. A future
-offline post-training package must not enter the serving dependency graph.
+the API used by serving code have different responsibilities.
 
 ## Decision
 
@@ -23,8 +22,6 @@ is the required local default; other backends are optional and must fail with
 a clear resolution error if configured but unavailable.
 
 The app lifespan owns the inference gateway and closes it on shutdown.
-`orchestrator.rl` is an offline-only scaffold whose future policy artifacts
-may be loaded through an inference source. No serving path imports `rl`.
 
 ## Consequences
 

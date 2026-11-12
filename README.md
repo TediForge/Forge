@@ -79,9 +79,6 @@ Forge orchestration engine
                           Synthesize response and events
                           Save configured checkpoints/audit
 
-Offline post-training (future):
-  runs / evaluation ──► orchestrator.rl ──► versioned policy artifact
-                                             └─► inference source
 ```
 
 The registry binds model IDs and capabilities to a source and default backend.
@@ -97,8 +94,7 @@ The application creates one `InferenceGateway` per lifespan and closes it
 after serving. Engine and tools use that gateway or modality facades; model
 backends and Hub clients remain inside `orchestrator.inference`. The local
 Transformers backend emits provider token chunks for streaming responses.
-`orchestrator.rl` is an offline-only scaffold and is never imported by serving
-code; its future policy artifacts may be loaded by inference sources.
+Trajectory export is opt-in.
 
 ## Workflow examples
 
@@ -361,7 +357,6 @@ dispatchers; consult the
 │       ├── engine/engine.py    ForgeEngine and graph execution
 │       ├── export/             Opt-in trajectory export
 │       ├── inference/          Registry, gateway, sources, backends, facades
-│       ├── rl/                 Offline post-training boundary and eval fixture
 │       ├── sandbox/            File and execution boundaries
 │       ├── security/           Identity, RBAC, audit, checkpoints
 │       ├── synthesis/          Response formatting and SSE
