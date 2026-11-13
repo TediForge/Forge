@@ -52,7 +52,13 @@ include = ["orchestrator*"]
 
 [tool.setuptools.package-data]
 "orchestrator.skills" = ["**/*.md"]
-"orchestrator.computer" = ["policy.json"]
+"orchestrator.computer" = [
+    "policy.json",
+    "images/Dockerfile.base",
+    "images/*.sh",
+    "images/*.service",
+    "images/manifests/*.json",
+]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]

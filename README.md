@@ -21,6 +21,7 @@ model capabilities, artifact sources, and execution backends.
 - [Installation](#installation)
 - [Configuration](#configuration)
 - [Run the service](#run-the-service)
+- [Building the Computer Image](#building-the-computer-image)
 - [Python usage](#python-usage)
 - [Project structure](#project-structure)
 - [Testing](#testing)
@@ -38,6 +39,8 @@ model capabilities, artifact sources, and execution backends.
   operations.
 - A computer tool that runs bounded commands and manages workspace files in
   disposable Firecracker microVMs on Linux/KVM deployments.
+- Declarative Ubuntu guest image manifests and a Linux rootfs builder for
+  pre-installed Python, Node.js, PHP, and Go runtimes.
 - Structured Thought, Action, and Status events, including streaming responses.
 - Provider-backed token streaming for the local Transformers text runtime.
 - Caller-owned external tools that can suspend a run and resume with the
@@ -331,6 +334,27 @@ directly, provide an authenticated `Principal` and inject any required
 dispatchers; consult the
 [runtime architecture](docs/architecture/orchestrator-runtime.md) and
 [wire contract](docs/references/wire-contract.md).
+
+## Building the Computer Image
+
+The computer runtime includes declarative image manifests in
+[`src/orchestrator/computer/images/manifests/`](src/orchestrator/computer/images/manifests/).
+On a Linux host with Docker, `mkfs.ext4`, loop mounts, and root privileges,
+build the default 4 GiB sparse root filesystem with:
+
+```bash
+sudo env PYTHONPATH=src python -m orchestrator.computer.images.builder \
+  --manifest base \
+  --output /var/lib/firecracker/rootfs.ext4
+```
+
+For a smaller Python-only runtime, use `--manifest python-only`. The image
+builder installs systemd, the non-root guest agent, and the runtimes listed in
+the selected manifest. The root filesystem is mounted read-only by
+Firecracker; `/workspace`, `/tmp`, and runtime state are temporary. Package
+downloads happen while building the image; the guest has no network interface.
+See the [computer runtime guide](docs/guides/computer-runtime.md) for kernel,
+KVM, and service configuration details.
 
 ## Project structure
 

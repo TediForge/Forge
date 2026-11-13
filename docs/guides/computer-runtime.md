@@ -44,53 +44,49 @@ VM creation and destruction are written to the configured JSONL audit log
 with the tenant, user, run, and instance IDs. Warm-pool instances that have
 not yet been assigned to a request use the `system` identity.
 
-## Guest image requirements
+## Building a guest image
 
-The image is not bundled with this repository. Provision it on a supported
-Linux host and ensure it:
+The repository includes strict JSON manifests and a Docker/ext4 builder in
+`src/orchestrator/computer/images/`. The `base` manifest specifies Ubuntu
+22.04 with Python 3.11, Node.js 20, PHP 8.2, Go 1.22, and common build tools.
+The `python-only` manifest is a smaller alternative. The strict loader rejects
+unknown fields, unsupported runtime versions, and paths outside `/workspace`
+and `/tmp`.
 
-1. Boots from the configured kernel and root filesystem using Firecracker.
-2. Works with a read-only root disk.
-3. Includes Python 3, Bash, systemd, and the computer guest-agent script at
-   `/usr/local/lib/forge/computer_guest.py`.
-4. Defines a non-root `computer` user and a systemd service for that agent.
-5. Provides `/workspace` as a temporary filesystem limited to the guest
-   service, so command-created files do not persist between orchestrator runs.
-6. Has no Firecracker network interface configured.
+On a Linux host with Docker, `mkfs.ext4`, loop mounts, `tar`, and root
+privileges, build the image from the repository root:
 
-An example systemd unit follows. Adapt the Python path and user/group to the
-image; validate the unit on the target distribution before deployment.
+```bash
+sudo env PYTHONPATH=src python -m orchestrator.computer.images.builder \
+  --manifest base \
+  --output /var/lib/firecracker/rootfs.ext4
+```
+
+Alternatively, run the wrapper from the repository root:
+
+```bash
+sudo env PYTHONPATH=src bash src/orchestrator/computer/images/build_rootfs.sh \
+  base /var/lib/firecracker/rootfs.ext4
+```
+
+The output is a 4 GiB sparse ext4 file; Docker and package
+repositories are contacted during image creation. The image is not built
+automatically by the Orchestrator, and Docker, mount, and ext4 utilities are
+not runtime dependencies.
+
+The builder creates a systemd guest with the non-root user and guest-agent
+service expected by Firecracker. It configures the image root disk as
+read-only, `/workspace`, `/tmp`, and volatile runtime state as temporary
+filesystems, and leaves network interfaces out of the Firecracker
+configuration. Install a compatible Linux kernel separately at the configured
+`kernel_path`; point `ComputerConfig.rootfs_path` at the generated image if it
+is not built at the configured default path.
 
 The manager binds a guest to one tenant/user/run tuple. Its workspace persists
 between computer operations in that run and is discarded when the run
-completes or suspends.
-
-```ini
-[Unit]
-Description=Forge computer guest agent
-After=local-fs.target
-
-[Service]
-Type=simple
-User=computer
-Group=computer
-WorkingDirectory=/workspace
-ExecStart=/usr/bin/python3 /usr/local/lib/forge/computer_guest.py
-Restart=always
-NoNewPrivileges=yes
-PrivateNetwork=yes
-PrivateTmp=yes
-ProtectSystem=strict
-ProtectHome=yes
-ProtectKernelTunables=yes
-ProtectKernelModules=yes
-PrivateDevices=yes
-RestrictAddressFamilies=AF_UNIX AF_VSOCK
-TemporaryFileSystem=/workspace:rw,nosuid,nodev,noexec,size=512M
-
-[Install]
-WantedBy=multi-user.target
-```
+completes or suspends. The guest service unit is
+`src/orchestrator/computer/images/forge-computer-agent.service`; it runs the
+agent as the manifest's unprivileged user.
 
 The guest agent is the host's only command/file protocol. Keep it running as
 the unprivileged user; do not grant it host mounts, credentials, or network
@@ -114,15 +110,23 @@ GUI and screenshot operations are not implemented.
 On any platform, run the focused unit tests:
 
 ```powershell
-python -m pytest tests/unit/test_computer.py
+python -m pytest tests/unit/test_manifest_loader.py tests/unit/test_computer.py
 ```
 
-On a Linux/KVM host with the required executable and guest images, run:
+To exercise actual Docker and ext4 rootfs creation, opt in on a Linux host
+where Docker works as root and the mount utilities are available:
+
+```bash
+FORGE_RUN_ROOTFS_BUILD_TESTS=1 python -m pytest tests/integration/test_rootfs_build.py
+```
+
+On a Linux/KVM host with the required executable, kernel, and guest image, run:
 
 ```powershell
 python -m pytest tests/integration/test_computer_firecracker.py
 ```
 
-The integration test skips when KVM, Firecracker, or either image is absent.
-On the Windows development host, the expected behavior is an explicit
+The Firecracker integration test skips when KVM, Firecracker, or either image
+is absent. The rootfs build test skips unless explicitly enabled. On the
+Windows development host, the expected behavior is an explicit
 `COMPUTER_UNAVAILABLE` result rather than local shell execution.

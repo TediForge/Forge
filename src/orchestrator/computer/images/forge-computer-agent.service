@@ -1,0 +1,27 @@
+[Unit]
+Description=Forge isolated computer guest agent
+After=local-fs.target
+Before=multi-user.target
+
+[Service]
+Type=simple
+User=@USER_NAME@
+Group=@USER_NAME@
+WorkingDirectory=/workspace
+ExecStart=/usr/bin/python3 /usr/local/lib/forge/computer_guest.py
+Restart=always
+RestartSec=1
+NoNewPrivileges=yes
+PrivateNetwork=yes
+PrivateTmp=yes
+ProtectSystem=strict
+ProtectHome=yes
+ProtectKernelTunables=yes
+ProtectKernelModules=yes
+PrivateDevices=yes
+RestrictAddressFamilies=AF_UNIX AF_VSOCK
+TemporaryFileSystem=/workspace:rw,nosuid,nodev,uid=@USER_UID@,gid=@USER_UID@,mode=0750,size=512M
+ReadWritePaths=/workspace /tmp /run /var/log
+
+[Install]
+WantedBy=multi-user.target

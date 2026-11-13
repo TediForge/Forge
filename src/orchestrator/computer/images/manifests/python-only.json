@@ -1,0 +1,31 @@
+{
+  "name": "forge-python",
+  "description": "Minimal Forge computer image with Python 3.11 and common test packages.",
+  "os": {
+    "base": "ubuntu:22.04",
+    "arch": "x86_64"
+  },
+  "system_packages": [
+    "build-essential",
+    "ca-certificates",
+    "git"
+  ],
+  "runtimes": {
+    "python": {
+      "version": "3.11",
+      "packages": ["pip", "venv"],
+      "global_pip": ["pytest", "requests"]
+    }
+  },
+  "directories": [
+    "/workspace",
+    "/workspace/uploads",
+    "/workspace/outputs",
+    "/tmp"
+  ],
+  "user": {
+    "name": "agent",
+    "uid": 1000,
+    "sudo": false
+  }
+}

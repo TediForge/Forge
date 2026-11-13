@@ -1,0 +1,48 @@
+{
+  "name": "forge-base",
+  "description": "Default Forge computer image with Python, Node.js, PHP, Go, and Git.",
+  "os": {
+    "base": "ubuntu:22.04",
+    "arch": "x86_64"
+  },
+  "system_packages": [
+    "build-essential",
+    "curl",
+    "wget",
+    "git",
+    "jq",
+    "vim",
+    "unzip",
+    "ca-certificates"
+  ],
+  "runtimes": {
+    "python": {
+      "version": "3.11",
+      "packages": ["pip", "venv"],
+      "global_pip": ["pytest", "requests"]
+    },
+    "node": {
+      "version": "20",
+      "global_npm": ["typescript", "ts-node"]
+    },
+    "php": {
+      "version": "8.2",
+      "extensions": ["mbstring", "xml", "curl"],
+      "composer": true
+    },
+    "go": {
+      "version": "1.22"
+    }
+  },
+  "directories": [
+    "/workspace",
+    "/workspace/uploads",
+    "/workspace/outputs",
+    "/tmp"
+  ],
+  "user": {
+    "name": "agent",
+    "uid": 1000,
+    "sudo": false
+  }
+}

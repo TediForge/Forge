@@ -1,0 +1,45 @@
+FROM ubuntu:22.04
+
+ENV DEBIAN_FRONTEND=noninteractive
+ENV PATH="/opt/forge-python/bin:/usr/local/go/bin:${PATH}"
+
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    ca-certificates curl gnupg software-properties-common systemd systemd-sysv dbus \
+    {{SYSTEM_PACKAGES}} \
+    && rm -rf /var/lib/apt/lists/*
+
+{{RUNTIME_REPOSITORIES}}
+
+{{RUNTIME_PACKAGE_INSTALL}}
+
+{{GO_RUNTIME}}
+{{RUNTIME_SETUP}}
+
+RUN groupadd --gid {{USER_UID}} {{USER_NAME}} \
+    && useradd --uid {{USER_UID}} --gid {{USER_UID}} --create-home \
+       --shell /usr/sbin/nologin {{USER_NAME}}
+
+RUN install -d -o {{USER_NAME}} -g {{USER_NAME}} {{DIRECTORIES}} \
+    /usr/local/lib/forge /etc/systemd/system/multi-user.target.wants
+
+COPY computer_guest.py /usr/local/lib/forge/computer_guest.py
+COPY forge-computer-agent.service /etc/systemd/system/
+RUN ln -sf /etc/systemd/system/forge-computer-agent.service \
+       /etc/systemd/system/multi-user.target.wants/forge-computer-agent.service \
+    && sed -i 's/@USER_NAME@/{{USER_NAME_SED}}/g' \
+       /etc/systemd/system/forge-computer-agent.service \
+    && sed -i 's/@USER_UID@/{{USER_UID_SED}}/g' \
+       /etc/systemd/system/forge-computer-agent.service \
+    && printf '%s\n' \
+       '/dev/vda / ext4 ro 0 1' \
+       'tmpfs /run tmpfs mode=755,nosuid,nodev 0 0' \
+       'tmpfs /tmp tmpfs mode=1777,nosuid,nodev 0 0' \
+       'tmpfs /var/log tmpfs mode=755,nosuid,nodev 0 0' \
+       > /etc/fstab \
+    && rm -f /etc/machine-id \
+    && ln -s /run/machine-id /etc/machine-id \
+    && mkdir -p /var/lib/dbus \
+    && ln -sf /etc/machine-id /var/lib/dbus/machine-id
+
+STOPSIGNAL SIGRTMIN+3
+CMD ["/sbin/init"]
