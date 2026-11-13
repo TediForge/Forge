@@ -25,7 +25,6 @@ model capabilities, artifact sources, and execution backends.
 - [Python usage](#python-usage)
 - [Project structure](#project-structure)
 - [Testing](#testing)
-- [Contributing](#contributing)
 - [License](#license)
 - [Support](#support)
 
@@ -378,7 +377,6 @@ KVM, and service configuration details.
 │   └── references/             API and tool contracts
 ├── tests/                      Unit, integration, and smoke tests
 ├── .env.example                Environment template
-├── CONTRIBUTING.md             Contribution process
 ├── LICENSE                     Proprietary license
 ├── pyproject.toml               Package and dependency metadata
 ├── requirements.txt             Container dependency ranges
@@ -397,12 +395,6 @@ python -m pytest
 Pytest is configured to collect tests only from `tests/`.
 For OpenAPI schema updates and local inference benchmarks, see the
 [development guide](docs/guides/development.md).
-
-## Contributing
-
-Read [CONTRIBUTING.md](CONTRIBUTING.md) before opening a change. Contributions
-should include focused tests and update documentation when behavior or public
-contracts change.
 
 ## License
 
