@@ -9,7 +9,7 @@ from orchestrator.tools.definitions.data import (
     TOOLS,
     data,
 )
-from orchestrator.sandbox import cleanupTmp
+from orchestrator.computer.workspace import cleanupTmp
 
 
 def test_all_enterprise_data_tools_declare_output_schemas():

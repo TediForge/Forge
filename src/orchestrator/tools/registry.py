@@ -75,6 +75,7 @@ DEFAULT_MODULES = (
     "orchestrator.tools.definitions.audio",
     "orchestrator.tools.definitions.calculator",
     "orchestrator.tools.definitions.clock",
+    "orchestrator.tools.definitions.computer",
     "orchestrator.tools.definitions.data",
     "orchestrator.tools.definitions.extract",
     "orchestrator.tools.definitions.fetch",

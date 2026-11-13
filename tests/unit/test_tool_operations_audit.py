@@ -119,6 +119,13 @@ def _valid_arguments(tool_name: str, operation: str) -> dict:
         arguments["expression"] = "1 + 1"
     elif tool_name == "clock" and operation == "convert":
         arguments.update(from_timezone="UTC", to_timezone="Europe/London", timestamp="2025-01-01T12:00:00")
+    elif tool_name == "computer":
+        if operation == "execute":
+            arguments["command"] = "printf test"
+        elif operation == "read_file":
+            arguments["path"] = "test.txt"
+        else:
+            arguments.update(path="test.txt", content="test")
     elif tool_name == "data":
         if operation == "table":
             arguments.update(path="uploads/missing.csv", options={"operation": "head"})

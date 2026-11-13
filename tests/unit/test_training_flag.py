@@ -3,6 +3,7 @@ import asyncio
 import pytest
 
 from orchestrator.engine.engine import ForgeEngine, IntentResult, RefinedPrompt
+from orchestrator.export.trajectory import TrajectoryExporter
 from orchestrator.schemas.v1.responses import ExternalToolDefinition
 from orchestrator.security.audit import AuditLog
 from orchestrator.security.durability import CheckpointStore
@@ -32,7 +33,13 @@ class DirectDispatcher:
         return "answer"
 
 
-def _engine(tmp_path):
+def _engine(tmp_path, monkeypatch):
+    export_dir = tmp_path / "exports"
+    monkeypatch.setattr(
+        TrajectoryExporter,
+        "from_environment",
+        classmethod(lambda cls: cls(enabled=True, output_dir=export_dir)),
+    )
     return ForgeEngine(
         text_dispatcher=DirectDispatcher(),
         audit_log=AuditLog(tmp_path / "audit.jsonl"),
@@ -67,9 +74,7 @@ async def _run_and_shutdown(engine, **kwargs):
 
 
 def test_training_export_is_per_request_opt_in(tmp_path, monkeypatch):
-    monkeypatch.setenv("FORGE_TRAJECTORY_EXPORT_ENABLED", "true")
-    monkeypatch.setenv("FORGE_TRAJECTORY_EXPORT_DIR", str(tmp_path / "exports"))
-    engine = _engine(tmp_path)
+    engine = _engine(tmp_path, monkeypatch)
     response = asyncio.run(_run_and_shutdown(engine))
     assert response.status == "completed"
     assert not list((tmp_path / "exports").glob("*.jsonl"))
@@ -77,24 +82,14 @@ def test_training_export_is_per_request_opt_in(tmp_path, monkeypatch):
 
 def test_opted_in_completed_autonomous_run_is_exported(tmp_path, monkeypatch):
     export_dir = tmp_path / "exports"
-    monkeypatch.setenv("FORGE_TRAJECTORY_EXPORT_ENABLED", "true")
-    monkeypatch.setenv("FORGE_TRAJECTORY_EXPORT_DIR", str(export_dir))
-    engine = _engine(tmp_path)
+    engine = _engine(tmp_path, monkeypatch)
     response = asyncio.run(_run_and_shutdown(engine, trajectory_export=True))
     assert response.status == "completed"
     assert len(list(export_dir.glob("*.jsonl"))) == 1
 
 
-def test_export_request_is_rejected_when_server_disabled(tmp_path, monkeypatch):
-    monkeypatch.setenv("FORGE_TRAJECTORY_EXPORT_ENABLED", "false")
-    engine = _engine(tmp_path)
-    with pytest.raises(ValueError, match="trajectoryExport requested but trajectory export is disabled server-side"):
-        _run(engine, trajectory_export=True)
-
-
 def test_interactive_training_export_is_rejected_even_with_external_tools(tmp_path, monkeypatch):
-    monkeypatch.setenv("FORGE_TRAJECTORY_EXPORT_ENABLED", "true")
-    engine = _engine(tmp_path)
+    engine = _engine(tmp_path, monkeypatch)
     external = [ExternalToolDefinition(name="getweather", description="Get weather")]
     with pytest.raises(ValueError, match="not supported for interactive runs"):
         _run(
@@ -106,9 +101,7 @@ def test_interactive_training_export_is_rejected_even_with_external_tools(tmp_pa
 
 def test_failed_run_is_not_exported(tmp_path, monkeypatch):
     export_dir = tmp_path / "exports"
-    monkeypatch.setenv("FORGE_TRAJECTORY_EXPORT_ENABLED", "true")
-    monkeypatch.setenv("FORGE_TRAJECTORY_EXPORT_DIR", str(export_dir))
-    engine = _engine(tmp_path)
+    engine = _engine(tmp_path, monkeypatch)
 
     async def failed_graph(plan, state, budget):
         budget.terminal_status = "failed"

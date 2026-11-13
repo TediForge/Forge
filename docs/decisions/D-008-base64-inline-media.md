@@ -1,5 +1,8 @@
 # D-008: Base64-Inline Media Contract
 
+> **Partially superseded by [D-027](./D-027-deployment-configuration-boundary.md):**
+> the media byte limit is a code-owned constant, not an environment override.
+
 - **Status:** Accepted
 - **Owner:** Orchestrator
 - **Related:** [Orchestrator Runtime](../architecture/orchestrator-runtime.md), [Wire Contract](../references/wire-contract.md), [D-007](./D-007-ordered-content-and-events.md)
@@ -17,10 +20,10 @@ Incoming attachments are base64-only; callers fetch their own URLs before
 submitting an attachment. Tool/provider media references are converted to
 bounded inline bytes before response serialization. URL conversion requires
 HTTPS, a configured hostname allowlist, and a public DNS address. Decoded
-media is limited by `FORGE_MEDIA_MAX_BYTES` (default 20 MiB), and recognized
-file signatures are checked against declared MIME types. The unified response
-contains media only as typed `content` blocks; source citation URLs remain
-separate.
+media is limited by the code-owned 20 MiB `MAX_MEDIA_BYTES` constant, and
+recognized file signatures are checked against declared MIME types. The
+unified response contains media only as typed `content` blocks; source
+citation URLs remain separate.
 
 For image analysis, the engine passes normalized base64 image data to a
 configured `vision` dispatcher via

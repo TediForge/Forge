@@ -4,6 +4,7 @@
 > former training-export terminology and prompt/response-only format are
 > superseded by a bounded, versioned, redacted trajectory contract. The
 > explicit-consent and completed autonomous-run boundary remains in force.
+> **The server-side environment gate is superseded by [D-027](./D-027-deployment-configuration-boundary.md).**
 
 - **Status:** Accepted
 - **Date:** 2026-11-09
@@ -16,15 +17,14 @@ Trajectory JSONL export is an optional evaluation side channel. The
 Chat Completions endpoint was a provider passthrough when this decision was
 written; it is now served by the registered Forge Text model. `/v1/responses`
 remains the orchestrator-owned prompt-to-synthesis flow. Exporting every
-request when the server toggle is enabled would collect data without an
-explicit request from the caller.
+request would collect data without explicit consent from the caller.
 
 ## Decision
 
-Export only when both `FORGE_TRAJECTORY_EXPORT_ENABLED=true` and the individual
-`/v1/responses` request sets `trajectoryExport=true`. The Forge-backed Chat
-Completions route never calls the exporter. If export is requested while
-disabled server-side, reject the request rather than silently ignoring it.
+Export only when the individual `/v1/responses` request sets
+`trajectoryExport=true`. The Forge-backed Chat Completions route never calls
+the exporter. Export requires explicit request consent and is not activated
+by deployment configuration.
 
 Compute effort is selected using `reasoning.effort`; execution topology is
 derived internally from the presence of caller-owned tools. Training export
@@ -35,21 +35,22 @@ Only successful completed autonomous Responses runs are exported. Records
 include a schema version, purpose, run identifier, messages, steps, tool calls,
 outcome, and metadata. Common credentials, emails, and phone numbers are
 redacted, and records exceeding the configured size limit are dropped.
-Export remains off by default. Optional Hugging Face synchronization is
-one-way; local files remain the source of truth and upload failure does not
+Export is inactive unless requested. Optional Hugging Face synchronization is
+one-way and requires a configured repository ID and `HF_TOKEN` with write
+permission; local files remain the source of truth and upload failure does not
 fail a run. This data handoff does not train a model.
 
 ## Consequences
 
-- Server operators and callers must both opt in.
+- Callers must explicitly opt in on each eligible request.
 - Chat Completions request/response data is not collected by this feature.
 - Interactive tool runs are not training examples.
 - Retention and curation belong to the owning data/ML platform.
 
 ## Alternatives considered
 
-- Export all runs whenever the server toggle is enabled: rejected because it
-  lacks per-request consent and includes non-opt-in Chat Completions traffic.
+- Export all runs: rejected because it lacks per-request consent and includes
+  non-opt-in Chat Completions traffic.
 - Combine effort and topology into a single enum: rejected because they answer
   independent runtime questions.
 - Stitch interactive requests into training examples: rejected because that

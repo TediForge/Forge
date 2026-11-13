@@ -10,7 +10,7 @@ from typing import Dict, Any
 from PIL import Image
 
 from orchestrator.schemas.v1.responses import AttachmentPayload, AttachmentType
-from orchestrator.settings import get_settings
+from orchestrator.settings import MAX_ATTACHMENT_BYTES
 
 logger = logging.getLogger(__name__)
 
@@ -53,7 +53,7 @@ class AttachmentDispatcherRouter:
     def extract_content(cls, attachment: AttachmentPayload) -> AttachmentContent:
         if attachment.fileData is None:
             return AttachmentContent("", False, "Attachment must be converted to base64 before extraction")
-        maxBytes = get_settings().attachment_max_bytes
+        maxBytes = MAX_ATTACHMENT_BYTES
         try:
             raw = base64.b64decode(attachment.fileData, validate=True)
         except (binascii.Error, ValueError) as exc:

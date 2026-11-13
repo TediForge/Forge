@@ -33,13 +33,12 @@ def test_image_attachment_extracts_ocr_text(monkeypatch):
 
 
 def test_oversized_base64_and_mime_mismatch_are_rejected(monkeypatch):
-    monkeypatch.setenv("FORGE_ATTACHMENT_MAX_BYTES", "1000")
     oversized = _attachment(file_data=base64.b64encode(b"abc").decode())
-    monkeypatch.setenv("FORGE_ATTACHMENT_MAX_BYTES", "2")
+    monkeypatch.setattr("orchestrator.attachments.MAX_ATTACHMENT_BYTES", 2)
     result = AttachmentDispatcherRouter.extract_content(oversized)
     assert not result.supported and "limit" in result.reason
 
-    monkeypatch.setenv("FORGE_ATTACHMENT_MAX_BYTES", "100")
+    monkeypatch.setattr("orchestrator.attachments.MAX_ATTACHMENT_BYTES", 100)
     mismatch = AttachmentDispatcherRouter.extract_content(_attachment(
         file_data=base64.b64encode(b"\xff\xd8\xffabc").decode(),
     ))

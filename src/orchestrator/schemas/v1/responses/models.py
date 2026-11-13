@@ -8,7 +8,7 @@ from enum import Enum
 from pydantic import AliasChoices, ConfigDict, Field, field_validator, model_validator
 from pydantic.alias_generators import to_camel
 
-from orchestrator.settings import get_settings
+from orchestrator.settings import MAX_ATTACHMENT_BYTES, MAX_MEDIA_BYTES
 from orchestrator.schemas.common import CamelBaseModel
 
 
@@ -63,7 +63,7 @@ class AttachmentPayload(CamelBaseModel):
 
     @model_validator(mode="after")
     def validate_encoded_file(self):
-        maxBytes = get_settings().attachment_max_bytes
+        maxBytes = MAX_ATTACHMENT_BYTES
         try:
             raw = base64.b64decode(self.fileData, validate=True)
         except (binascii.Error, ValueError) as exc:
@@ -204,7 +204,7 @@ class ResponsesInputContent(CamelBaseModel):
             raw = base64.b64decode(self.mediaData, validate=True)
         except (binascii.Error, ValueError) as exc:
             raise ValueError("mediaData must be valid base64") from exc
-        maxBytes = get_settings().media_max_bytes
+        maxBytes = MAX_MEDIA_BYTES
         if len(raw) > maxBytes:
             raise ValueError(f"decoded mediaData exceeds the {maxBytes}-byte limit")
         return self
@@ -304,7 +304,7 @@ class ContentBlock(CamelBaseModel):
                 raw = base64.b64decode(self.mediaData, validate=True)
             except (ValueError, base64.binascii.Error) as exc:
                 raise ValueError("mediaData must be valid base64") from exc
-            maxBytes = get_settings().media_max_bytes
+            maxBytes = MAX_MEDIA_BYTES
             if len(raw) > maxBytes:
                 raise ValueError(f"decoded mediaData exceeds the {maxBytes}-byte limit")
             if self.fileSizeBytes is not None and self.fileSizeBytes != len(raw):

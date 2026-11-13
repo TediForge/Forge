@@ -11,7 +11,7 @@ from urllib.parse import urlsplit
 
 import httpx
 
-from orchestrator.settings import get_settings
+from orchestrator.settings import MAX_MEDIA_BYTES, get_settings
 
 
 class MediaConversionError(ValueError):
@@ -49,7 +49,7 @@ class MediaConverter:
 
     @classmethod
     def from_environment(cls) -> "MediaConverter":
-        return cls(max_bytes=get_settings().media_max_bytes)
+        return cls(max_bytes=MAX_MEDIA_BYTES)
 
     async def fromUrl(
         self,

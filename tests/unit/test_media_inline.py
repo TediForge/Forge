@@ -26,7 +26,7 @@ def test_base64_media_is_bounded_and_has_no_url_field(monkeypatch):
     assert "url" not in serialized
     assert serialized["fileSizeBytes"] == len(base64.b64decode(PNG_DATA))
 
-    monkeypatch.setenv("FORGE_MEDIA_MAX_BYTES", "1")
+    monkeypatch.setattr("orchestrator.schemas.v1.responses.models.MAX_MEDIA_BYTES", 1)
     with pytest.raises(ValueError, match="exceeds"):
         ContentBlock(type="image", mediaData=PNG_DATA, mimeType="image/png")
     with pytest.raises(MediaConversionError, match="MIME"):

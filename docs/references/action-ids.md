@@ -13,6 +13,9 @@ registered operation has one row. No registered handler returns
 | `A4M9Q2` | `calculate(operation=evaluate)` | Evaluate a calculation |
 | `A9C5J8` | `clock(operation=now)` | Retrieve the current time |
 | `A7T4M1` | `clock(operation=convert)` | Convert an ISO 8601 timestamp between timezones |
+| `A8M4C7` | `computer(operation=execute)` | Run a command in an isolated Firecracker microVM |
+| `A3C1V6` | `computer(operation=read_file)` | Read a file from an isolated Firecracker microVM |
+| `A9P5D2` | `computer(operation=write_file)` | Write a file to an isolated Firecracker microVM |
 | `A6P3N8` | `data(operation=table)` | Analyze a dataset |
 | `A8Q1R5` | `data(operation=sql)` | Run an allowed read-only SQL query |
 | `A3D9W2` | `data(operation=profile)` | Profile a dataset |

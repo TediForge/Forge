@@ -8,7 +8,7 @@ import sqlite3
 from pathlib import Path
 from typing import Any
 
-from orchestrator.sandbox.pathPolicy import SandboxPathError, safePath as _safePath, workspaceRelativePath as _relativePath
+from orchestrator.computer.workspace import SandboxPathError, safePath as _safePath, workspaceRelativePath as _relativePath
 from orchestrator.tools.actions import action_handler
 
 

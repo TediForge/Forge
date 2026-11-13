@@ -2,7 +2,7 @@
 
 from typing import Any
 
-from orchestrator.sandbox.pathPolicy import SandboxPathError, safePath, workspaceRelativePath
+from orchestrator.computer.workspace import SandboxPathError, safePath, workspaceRelativePath
 from orchestrator.tools.actions import action_handler
 
 

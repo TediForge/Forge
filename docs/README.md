@@ -47,6 +47,8 @@ history.
 
 The [development guide](./guides/development.md) documents CI schema checks,
 OpenAPI regeneration, and local inference benchmarking.
+The [computer runtime guide](./guides/computer-runtime.md) describes the
+optional Linux/KVM Firecracker guest prerequisites and test procedure.
 
 ## Existing references
 
@@ -83,6 +85,8 @@ OpenAPI regeneration, and local inference benchmarking.
 - [D-023: Keep non-model integrations in their tool modules](./decisions/D-023-tool-local-non-model-integrations.md)
 - [D-024: Inference is multi-backend and multi-source](./decisions/D-024-multisource-inference-gateway.md)
 - [D-025: One reasoning control, optional suggestions, and bounded trajectories](./decisions/D-025-response-effort-suggestions-trajectories.md)
+- [D-026: Isolate computer commands in disposable Firecracker microVMs](./decisions/D-026-agent-computer-layer.md)
+- [D-027: Deployment configuration is separate from code defaults](./decisions/D-027-deployment-configuration-boundary.md)
 
 ## Research
 

@@ -8,6 +8,7 @@ from typing import Any, Mapping
 import jsonschema
 
 from orchestrator.media import MediaConversionError, MediaConverter
+from orchestrator.computer.manager import ComputerManager
 
 @dataclass
 class ToolResult:
@@ -36,6 +37,8 @@ class ToolExecutor:
         registry=None,
         mediaConverter: MediaConverter | None = None,
         toolDependencies: Mapping[str, Mapping[str, Any]] | None = None,
+        computerManager: ComputerManager | None = None,
+        auditLog=None,
     ) -> None:
         if registry is None:
             from orchestrator.tools.registry import create_default_registry
@@ -43,10 +46,31 @@ class ToolExecutor:
             registry = create_default_registry()
         self.registry = registry
         self.mediaConverter = mediaConverter or MediaConverter.from_environment()
+        self.computerManager = computerManager or ComputerManager(audit_log=auditLog)
+        if computerManager is not None and auditLog is not None:
+            computerManager.audit_log = auditLog
         self.toolDependencies = {
             name: dict(dependencies)
             for name, dependencies in (toolDependencies or {}).items()
         }
+        self.toolDependencies.setdefault("computer", {})["computerManager"] = self.computerManager
+
+    async def close(self) -> None:
+        await self.computerManager.close()
+
+    async def closeComputerSession(
+        self,
+        run_id: str,
+        *,
+        tenant_id: str | None = None,
+        user_id: str | None = None,
+    ) -> None:
+        session_id = self._computerSessionId({
+            "tenant_id": tenant_id,
+            "user_id": user_id,
+            "run_id": run_id,
+        }) or run_id
+        await self.computerManager.close_session(session_id)
 
     def execute(self, tool_call: Mapping[str, Any]) -> Any:
         name, arguments, validation_error = self._validated_call(tool_call)
@@ -58,7 +82,15 @@ class ToolExecutor:
         name, arguments, validation_error = self._validated_call(tool_call)
         if validation_error:
             return validation_error
-        result = self.registry.execute(name, self._argumentsWithDependencies(name, arguments))
+        dependencies = self._argumentsWithDependencies(name, arguments)
+        if name == "computer" and context is not None:
+            session_id = self._computerSessionId(context)
+            if session_id is not None:
+                dependencies["computerSessionId"] = session_id
+                dependencies["computerTenantId"] = context.get("tenant_id")
+                dependencies["computerUserId"] = context.get("user_id")
+                dependencies["computerRunId"] = context.get("run_id")
+        result = self.registry.execute(name, dependencies)
         result = await result if inspect.isawaitable(result) else result
         return await self._normalizeMediaResult(result)
 
@@ -68,6 +100,13 @@ class ToolExecutor:
         arguments: Mapping[str, Any],
     ) -> dict[str, Any]:
         return {**arguments, **self.toolDependencies.get(name, {})}
+
+    @staticmethod
+    def _computerSessionId(context: Mapping[str, Any]) -> str | None:
+        session_parts = [context.get(key) for key in ("tenant_id", "user_id", "run_id")]
+        if not all(isinstance(part, str) and part for part in session_parts):
+            return None
+        return json.dumps(session_parts, separators=(",", ":"))
 
     async def _normalizeMediaResult(self, result: Any) -> Any:
         if isinstance(result, ToolResult):
@@ -85,7 +124,7 @@ class ToolExecutor:
             path = data.get("outputPath", data.get("path"))
             if isinstance(path, str) and mediaType in {"image", "video", "audio", "file"}:
                 try:
-                    from orchestrator.sandbox.pathPolicy import safePath
+                    from orchestrator.computer.workspace import safePath
 
                     inline = self.mediaConverter.fromFile(safePath(path, mode="read"))
                 except (MediaConversionError, ValueError, OSError):

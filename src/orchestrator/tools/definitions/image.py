@@ -5,7 +5,7 @@ from typing import Any
 import uuid
 
 from orchestrator.inference.modalities import DispatcherError
-from orchestrator.sandbox.pathPolicy import SandboxPathError, safePath, workspaceRelativePath
+from orchestrator.computer.workspace import SandboxPathError, safePath, workspaceRelativePath
 from orchestrator.tools.actions import action_handler
 
 

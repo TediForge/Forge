@@ -11,7 +11,7 @@ from typing import Any
 from orchestrator.security.audit import redact
 from orchestrator.export.formatters import format_openai_chat_jsonl
 from orchestrator.export.huggingface import HuggingFaceSync
-from orchestrator.settings import get_settings
+from orchestrator.settings import DEFAULT_TRAJECTORY_EXPORT_DIR, get_settings
 
 
 logger = logging.getLogger(__name__)
@@ -46,7 +46,7 @@ class TrajectoryExporter:
     def __init__(
         self,
         enabled: bool = False,
-        output_dir: str | Path = "logs/trajectories",
+        output_dir: str | Path = DEFAULT_TRAJECTORY_EXPORT_DIR,
         max_queue_size: int = 1000,
         flush_interval: float = 5.0,
         huggingface_sync: HuggingFaceSync | None = None,
@@ -68,23 +68,21 @@ class TrajectoryExporter:
         self._huggingface_sync = huggingface_sync
 
         settings = get_settings()
-        if self.enabled and settings.hf_sync_enabled:
-            try:
-                token = settings.hf_sync_token
-                self._huggingface_sync = self._huggingface_sync or HuggingFaceSync(
-                    token=token.get_secret_value() if token is not None else "",
-                    repo_id=settings.hf_repo_id,
-                    repo_type=settings.hf_repo_type,
-                )
-            except Exception:
-                logger.exception("Hugging Face sync is unavailable; local training export remains enabled")
+        token = settings.hf_token
+        token_value = token.get_secret_value() if token is not None else ""
+        if settings.hf_repo_id and not token_value:
+            raise ValueError("HF_TOKEN is required when FORGE_HF_REPO_ID is configured")
+        if self.enabled and settings.hf_repo_id:
+            self._huggingface_sync = self._huggingface_sync or HuggingFaceSync(
+                token=token_value,
+                repo_id=settings.hf_repo_id,
+            )
 
     @classmethod
     def from_environment(cls) -> "TrajectoryExporter":
-        settings = get_settings()
         return cls(
-            enabled=settings.trajectory_export_enabled,
-            output_dir=settings.trajectory_export_dir,
+            enabled=True,
+            output_dir=DEFAULT_TRAJECTORY_EXPORT_DIR,
         )
 
     def record(

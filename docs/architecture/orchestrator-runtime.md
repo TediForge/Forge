@@ -55,6 +55,7 @@ is opt-in, versioned, redacted, and bounded. See
 | 2026-11-10 | Uwagbae | Changed | Round 29 — Moved the Open-Meteo client into the weather tool; `core/models/adapters` is for AI model integrations (D-023). |
 | 2026-11-10 | Uwagbae | Changed | Round 28 — Removed the persistent state store and built-in `todo`/`memory` tools; callers provide stateful capabilities as external tools (D-022). |
 | 2026-11-11 | Uwagbae | Changed | Round 27 — Implemented all registered operations; removed unavailable or unsafe operations; split `extract` and `summarize`; deleted `future_tools.py`; no registered handler returns `NOT_IMPLEMENTED` (D-021). |
+| 2026-11-12 | Uwagbae | Added | Registered the `computer` tool on the isolated Firecracker backend; preserved the filesystem sandbox for existing tools; added a guest agent, bounded pool, policy checks, and Linux/KVM integration coverage (D-026). |
 | 2026-11-10 | Uwagbae | Changed | Round 25/26 — D-020 requires `operation` on every registered tool; registered known missing domains as honest `NOT_IMPLEMENTED` placeholders; skills, Action IDs, and schema enforcement updated; D-019 annotated as partially superseded. |
 | 2026-11-10 | Uwagbae | Decided | Round 23 — D-019 makes data operations one `data` tool and skill; documents the already consolidated image/video domains; adds tool/skill parity enforcement; D-009 annotated as partially superseded. |
 | 2026-11-10 | Uwagbae | Changed | Round 15 — Removed MCP integration adapters and service skills; external service functions are caller-owned under D-004. Added bounded local JSON extraction/extractive summarization and expanded tool skills. |
@@ -120,9 +121,9 @@ is opt-in, versioned, redacted, and bounded. See
 - Tool Thought events remain only as explicitly deprecated compatibility
   events for one release. See D-001 and D-002 and the references under
   `docs/references/`.
-- Effort (`mode`) and execution topology are separate. Training export is off
-  by default and requires both the server toggle and per-request
-  `metadata.trainingExport=true`; only completed autonomous `/v1/responses` runs qualify.
+- Effort (`mode`) and execution topology are separate. Trajectory export is
+  inactive unless the caller sets `trajectoryExport=true`; only completed
+  autonomous `/v1/responses` runs qualify.
 - Approval, policy, ABAC, and egress scaffolding has been removed. RBAC still
   gates `orchestrate:run`; the HTTP routes require a trusted
   `request.state.principal` populated by upstream authentication middleware.
@@ -312,11 +313,15 @@ src/
       identity.py                   Principal and required-identity helper
       rbac.py                       Role-to-permission authorization
       runtime.py                    ProductionIdentityResolver and anonymous-mode flag
-  sandbox/
-    __init__.py                     Sandbox policy exports
-    pathPolicy.py                   Filesystem policy, safe paths, temp cleanup
-    policy.json                     Sandbox roots/extensions/retention policy
-    README.md                       Sandbox usage notes
+  computer/
+    config.py                       Code-owned Firecracker paths and resource limits
+    hypervisor.py                   Firecracker API and microVM lifecycle
+    instance.py                     Guest command and workspace file client
+    guest.py                        Vsock guest agent installed in the prepared guest image
+    manager.py                      Memory-aware autoscaling pool of run-scoped VM leases
+    policy.py                       Command and workspace path guardrails
+    workspace.py                    Local-tool path policy and temp cleanup
+    policy.json                     Local-tool workspace roots/extensions/retention
   ochestrator/
     __init__.py                     OpenAI Agents SDK wrapper exports
     events.py                       SDK stream-event conversion
@@ -526,9 +531,8 @@ converted to base64 by `ToolExecutor` before model or response use.
 | `StreamEvent` | Discriminated union: `event`, `textChunk`, `function_call`, `media`, or `complete`; run ID; sequence >= 1; data typed per packet | `event.data` is `OrchestratorEvent`; timeline items are not separate SSE packet types |
 
 Effort comes from `reasoning.effort`; topology is derived from the presence of
-caller-owned `tools` and is not client-controlled. Training export requests
-are rejected when the server toggle is off or external tools make the run
-interactive.
+caller-owned `tools` and is not client-controlled. A `trajectoryExport=true`
+request is rejected for external-tool runs because those runs are interactive.
 
 `ForgeEngine.run` additionally accepts external function schemas, topology,
 effort mode, and per-request training export. `previous_response_id` and
@@ -584,7 +588,7 @@ See lifecycle gaps G-003 and G-026.
 |---|---|---|
 | `src/orchestrator/api/__init__.py` | Creates FastAPI and imports the versioned routers | Lifespan constructs the engine and shuts down the exporter |
 | `src/orchestrator/api/v1/responses/routes.py` | Defines engine/helpers; no skill-file read | `_load_skill()` reads when classification/refinement/title helpers execute |
-| `sandbox/pathPolicy.py` | Defines path-policy functions; no policy JSON read or environment lookup | `_sandboxRoot()` reads `FORGE_SANDBOX_ROOT`; `_loadPolicy()` reads `policy.json` when a safe path/cleanup call occurs |
+| `computer/workspace.py` | Defines local-tool path-policy functions; no policy JSON read or environment lookup | `_sandboxRoot()` reads `FORGE_SANDBOX_ROOT`; `_loadPolicy()` reads `policy.json` when a safe path/cleanup call occurs |
 | `src/orchestrator/security/runtime.py` | Defines resolver class | `FORGE_ALLOW_ANONYMOUS` is read by resolver construction |
 | `src/orchestrator/security/audit.py`, `src/orchestrator/security/durability.py` | No directory creation on import | Constructors create log/checkpoint directories |
 | `src/orchestrator/tools/definitions/` / `src/orchestrator/tools/executor.py` | No tool handlers or HTTP clients are created on import | The engine creates its shared media converter; handlers execute only when selected |
@@ -612,7 +616,7 @@ The run creates ambient date/time context, a new `SessionManager(sessionId, hist
 Mappings are converted to `AttachmentPayload`; each current-turn attachment
 provides base64 bytes only. Remote attachment URLs are rejected and must be
 fetched by the caller before submission. Media is bounded by
-`FORGE_ATTACHMENT_MAX_BYTES` (default 10 MiB) and checked for declared
+the code-owned `MAX_ATTACHMENT_BYTES` limit (10 MiB) and checked for declared
 size/checksum and recognized MIME signatures. History attachments remain
 base64-only. The dispatcher extracts image OCR and supported text content;
 unsupported formats return an explicit unsupported result. Extracted
@@ -747,7 +751,7 @@ Capability matching normalizes underscores/case, adds 100 for exact capability a
 
 ## 9. Tools [IMPLEMENTED]
 
-`DEFAULT_MODULES` registers 17 local tool names. Every tool requires one of
+`DEFAULT_MODULES` registers 18 local tool names. Every tool requires one of
 the operation values below; the same values appear in its skill and the
 Action ID catalog.
 
@@ -756,6 +760,7 @@ Action ID catalog.
 | `audio(operation=...)` | `probe`, `trim`, `convert` implemented |
 | `calculate(operation=...)` | `evaluate` implemented |
 | `clock(operation=...)` | `now`, `convert` implemented |
+| `computer(operation=...)` | `execute`, `read_file`, `write_file` implemented in disposable Firecracker microVMs |
 | `data(operation=...)` | `table`, `sql`, `profile`, `join`, `report`, `chart` implemented |
 | `extract(operation=...)` | `json`, `xml`, `yaml`, `csv` implemented |
 | `fetch(operation=...)` | `url`, `pdf`, `json` implemented with allowlisted HTTPS retrieval |
@@ -773,13 +778,26 @@ Action ID catalog.
 
 No registered operation returns `NOT_IMPLEMENTED`. Provider-backed operations
 return explicit provider/configuration errors when a deployment dependency is
-unavailable. The former aggregate `future_tools.py` was deleted; each active
-tool has its own definition module and exactly one matching skill folder with
-one `SKILL.md`. Unrestricted code/shell execution, interactive browser control,
-image analysis/detection, video generation, and PDF table/image extraction were
-removed from the public tool contract because they lack a safe available
-backend. `fetch`, URL summarization, and weather are explicit network
-integrations with bounded behavior; see D-021.
+unavailable. The `computer` tool requires Linux/KVM and a prepared guest
+image; it returns `COMPUTER_UNAVAILABLE` rather than running commands on the
+host when those dependencies are missing. The guest has no network interface,
+uses a read-only root disk, mounts `/workspace` as temporary storage, and
+executes commands as an unprivileged user. The pool maintains five warm
+instances and scales on demand up to a code-owned limit of 200, further
+bounded by detected host/cgroup memory. Same-run operations are serialized
+and acquisition waits up to 30 seconds at capacity. Snapshot cloning is not
+enabled because the runtime has no safe guest-side entropy/identity-reset
+protocol. These defaults are code-owned in
+`orchestrator/computer/config.py`, not environment variables. Local file
+tools retain their path policy in
+`computer/workspace.py`; it is separate from the isolated guest runtime.
+The former aggregate `future_tools.py` was deleted;
+each active tool has its own definition module and exactly one matching skill
+folder with one `SKILL.md`. Host-process code/shell execution, interactive
+browser control, image analysis/detection, video generation, and PDF
+table/image extraction remain unavailable. `fetch`, URL summarization, and
+weather are explicit network integrations with bounded behavior; see D-021
+and D-026.
 `test_one_skill_per_tool.py` enforces parity;
 `test_tool_operations_audit.py` checks the required operation field and
 skill/schema agreement and implemented statuses. See
@@ -814,7 +832,7 @@ name and schema path, not raw arguments. See
 [D-006](../decisions/D-006-wire-camelcase-and-validation.md).
 
 Filesystem-facing local handlers enforce paths using `safePath()` in
-`src/orchestrator/sandbox/pathPolicy.py`. Media URLs produced by local tools are converted
+`src/orchestrator/computer/workspace.py`. Media URLs produced by local tools are converted
 to bounded base64 before they can reach the model or response. Citation URLs
 are kept separately in `SourceReference`.
 
@@ -855,8 +873,9 @@ default artifact locators, and backends:
 `InferenceGateway` resolves each configured locator through its source, then
 constructs the selected backend with the local artifact path. Backends run the
 declared runtime locally; gateway instances are cached and closed with the
-application lifespan. `HF_TOKEN` is read only by `HuggingFaceSource` for Hub
-downloads. Model source and backend settings can override registry defaults.
+application lifespan. `HF_TOKEN` is used by `HuggingFaceSource` for private or
+gated Hub downloads and by `HuggingFaceSync` when optional uploads are
+configured. Model source and backend settings can override registry defaults.
 Optional backends that are not configured fail explicitly at resolution.
 
 The catalog endpoint exposes registry entries as OpenAI-compatible model
@@ -983,33 +1002,39 @@ expired files. Tenant-path traversal and partial-file writes are covered by
 
 ## 12. Configuration & environment [PARTIAL]
 
-Names only; never place secrets in docs or source. Runtime model defaults are
-code-owned and intentionally absent from this environment table.
+`Settings` uses Pydantic Settings with the `FORGE_` prefix, `.env` loading, and
+unknown-variable ignoring. Explicit aliases are used for `HF_TOKEN` and
+`OTEL_EXPORTER_OTLP_ENDPOINT`. The checked-in `.env.example` contains optional
+deployment identity, mounted paths, secrets, and external endpoints only.
 
 | Variable | Consumer | Required? / purpose |
 |---|---|---|
-| `HF_TOKEN` | `HuggingFaceInference` | Optional; used only when downloading weights from private Hugging Face Hub repositories |
-| `FORGE_ALLOW_ANONYMOUS` | `src/orchestrator/security/runtime.py` | Optional; defaults to false; affects only standalone identity resolver |
-| `FORGE_SANDBOX_ROOT` | `sandbox/pathPolicy.py` | Optional; overrides sandbox root; otherwise root is `sandbox/` |
-| `FORGE_CHECKPOINT_ROOT` | `CheckpointStore` | Optional; defaults to `data/checkpoints`; must be persistent in production |
+| `FORGE_ENVIRONMENT` | `Settings` / app lifespan | Optional; `development` by default; `production` requires an explicit checkpoint root |
+| `FORGE_CHECKPOINT_ROOT` | `CheckpointStore` / readiness route | Optional outside production; defaults to `data/checkpoints`; persistent storage is required in production |
 | `FORGE_CHECKPOINT_RETENTION_DAYS` | `CheckpointStore` | Optional; defaults to 30 days; minimum one day |
-| `FORGE_TRAINING_EXPORT_ENABLED` | `TrainingDataExporter` | Optional; defaults false; request must also set `metadata.trainingExport=true` |
-| `FORGE_TRAINING_EXPORT_DIR` | `TrainingDataExporter` | Optional; defaults to `logs/training-export` |
-| `FORGE_HF_SYNC_ENABLED` | `TrainingDataExporter` | Optional; defaults false; uploads local JSONL files one-way |
-| `FORGE_HF_TOKEN` | `HuggingFaceSync` | Required only when HF sync is enabled; never logged |
-| `FORGE_HF_REPO_ID` | `HuggingFaceSync` | Required only when HF sync is enabled |
-| `FORGE_HF_REPO_TYPE` | `HuggingFaceSync` | Optional; defaults to `dataset` |
-| `FORGE_MEDIA_MAX_BYTES` | `MediaConverter` and media schemas | Optional; defaults to 20 MiB per media asset |
-| `FORGE_MEDIA_ALLOWED_HOSTS` | `MediaConverter` | Required to fetch URL-backed media produced by tools; comma-separated public hosts |
-| `FORGE_ATTACHMENT_MAX_BYTES` | `AttachmentPayload` and attachment router | Optional; defaults to 10 MiB per attachment |
+| `FORGE_AUDIT_LOG_PATH` | `AuditLog` | Optional deployment path override; defaults to `logs/forge-audit.jsonl` |
+| `FORGE_SANDBOX_ROOT` | `computer/workspace.py` | Optional deployment mount; defaults to the computer package directory |
+| `FORGE_MODEL_CACHE_DIR` | `InferenceGateway` / `HuggingFaceSource` | Optional deployment path override; defaults to `data/models` |
+| `FORGE_INFERENCE_DEVICE` | Inference backends | Optional; defaults to `cpu`; use a supported local device value |
+| `FORGE_INFERENCE_MAX_CONCURRENCY` | `InferenceGateway` | Optional; defaults to 4 |
+| `FORGE_INFERENCE_TIMEOUT_SECONDS` | `InferenceGateway` | Optional; defaults to 120 seconds |
+| `FORGE_MEDIA_ALLOWED_HOSTS` | `MediaConverter` | Optional comma-separated allowlist; required for URL-backed media fetches |
+| `FORGE_ALLOW_ANONYMOUS` | `src/orchestrator/security/runtime.py` | Optional; defaults to false; affects only standalone identity resolver |
+| `OTEL_EXPORTER_OTLP_ENDPOINT` | Tracing configuration | Optional deployment-specific HTTP/protobuf collector URL |
+| `FORGE_HF_REPO_ID` | `TrajectoryExporter` | Optional destination; requires `HF_TOKEN` with write permission to enable one-way upload |
+| `HF_TOKEN` | `HuggingFaceSource` / `HuggingFaceSync` | Optional Hub secret; used for private/gated downloads and, when configured, one-way uploads |
 
-Secrets belong in deployment secret configuration, not `.py`, docs, or
-committed env files. `.env.example` contains names and safe defaults only.
-Integration credentials live in the caller, not in the orchestrator.
-Model configuration is intentionally source-controlled in the model registry
-and local runtime constants, not environment variables.
-Sandbox roots/extensions/temporary retention are configured by
-`src/orchestrator/sandbox/policy.json`, with root override through `FORGE_SANDBOX_ROOT`.
+`MAX_ATTACHMENT_BYTES` (10 MiB) and `MAX_MEDIA_BYTES` (20 MiB) are code-owned
+limits in `src/orchestrator/settings.py`; they cannot be changed through
+environment variables. The trajectory directory defaults to
+`logs/trajectories` in code. Repository type for optional Hub upload is fixed
+to `dataset`. Sandbox roots, extensions, and temporary retention are defined
+in `src/orchestrator/computer/policy.json`.
+
+The settings model also supports JSON mappings for inference backend and
+source overrides; those have active gateway consumers but are not listed in
+`.env.example`. The settings model does not expose unused artifact-store,
+remote-backend, or quantization fields.
 
 ## 13. Observability [PARTIAL]
 
@@ -1018,12 +1043,13 @@ Sandbox roots/extensions/temporary retention are configured by
 - No metrics exporter, tracing instrumentation, health probes, readiness checks, or request correlation middleware is wired.
 - `ExecutionBudget.metrics()` returns steps, iterations, tool calls, estimated tokens, elapsed seconds, terminal status, and termination reason. Static synthesis includes these metrics; stream execution does not pass budget metrics into the final synthesizer.
 - Draft `/health` and `/ready` routes do not exist at runtime.
-- The optional training exporter writes caller-visible prompt/final-response
-  pairs in OpenAI JSONL format. It is off by default, runs only when both the
-  server toggle and `/v1/responses` `metadata.trainingExport=true` are set, and skips
+- The optional trajectory exporter writes caller-visible prompt/final-response
+  pairs in OpenAI JSONL format. It is inactive unless the
+  `/v1/responses` request sets `trajectoryExport=true`, and skips
   failed and interactive runs. It does not curate or clean examples. Optional
-  Hugging Face synchronization uploads the complete local daily file; it is
-  one-way, and upload failures do not affect the local file or run.
+  Hugging Face synchronization uploads the complete local daily file when
+  both repository ID and token are configured; it is one-way, and upload
+  failures do not affect the local file or run.
 
 ## 14. Tests [PARTIAL]
 
@@ -1067,7 +1093,7 @@ testpaths = ["tests"]
 pythonpath = [".", "tests"]
 ```
 
-`tests/conftest.py` reads `src/orchestrator/sandbox/policy.json`, creates a temporary policy/workspace, and sets `FORGE_SANDBOX_ROOT`; it contains no sibling-tree path insertion. The provenance command, run from the `tests` directory with the project root on `PYTHONPATH`, printed:
+`tests/conftest.py` reads `src/orchestrator/computer/policy.json`, creates a temporary policy/workspace, and sets `FORGE_SANDBOX_ROOT`; it contains no sibling-tree path insertion. The provenance command, run from the `tests` directory with the project root on `PYTHONPATH`, printed:
 
 ```text
 C:\TediForge\Forge\backend\orchestrator\tests\test_eval.py

@@ -5,6 +5,7 @@ import httpx
 
 from orchestrator.api import app
 from orchestrator.engine.engine import ForgeEngine, IntentResult, RefinedPrompt
+from orchestrator.export.trajectory import TrajectoryExporter
 from orchestrator.security.audit import AuditLog
 from orchestrator.security.durability import CheckpointStore
 from orchestrator.security.identity import Principal
@@ -59,8 +60,11 @@ class AuthenticatedASGI:
 
 def test_forge_chat_never_exports_and_responses_requires_opt_in(tmp_path, monkeypatch):
     export_dir = tmp_path / "trajectories"
-    monkeypatch.setenv("FORGE_TRAJECTORY_EXPORT_ENABLED", "true")
-    monkeypatch.setenv("FORGE_TRAJECTORY_EXPORT_DIR", str(export_dir))
+    monkeypatch.setattr(
+        TrajectoryExporter,
+        "from_environment",
+        classmethod(lambda cls: cls(enabled=True, output_dir=export_dir)),
+    )
 
     async def scenario():
         previous_engine = getattr(app.state, "engine", None)

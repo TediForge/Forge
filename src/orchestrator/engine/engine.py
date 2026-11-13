@@ -46,7 +46,7 @@ from orchestrator.security.audit import AuditLog
 from orchestrator.security.durability import CheckpointStore
 from orchestrator.skills.loader import loadSkillBody
 from orchestrator.tools.executor import ToolExecutor, ToolResult
-from orchestrator.sandbox.pathPolicy import cleanupTmp
+from orchestrator.computer.workspace import cleanupTmp
 from orchestrator.export.trajectory import TrajectoryExporter
 
 
@@ -563,6 +563,7 @@ class ForgeEngine:
         self.mediaConverter = MediaConverter.from_environment()
         self.toolExecutor = ToolExecutor(
             mediaConverter=self.mediaConverter,
+            auditLog=self.auditLog,
             toolDependencies={
                 "fetch": {"mediaConverter": self.mediaConverter},
                 "image": {"dispatcher": configured_dispatchers["image"]},
@@ -594,7 +595,11 @@ class ForgeEngine:
                 result = close()
                 if inspect.isawaitable(result):
                     closers.append(result)
-        closers.extend((self.trajectoryExporter.shutdown(), self.mediaConverter.close()))
+        closers.extend((
+            self.trajectoryExporter.shutdown(),
+            self.mediaConverter.close(),
+            self.toolExecutor.close(),
+        ))
         if self._ownsInferenceGateway:
             closers.append(self.inferenceGateway.close())
         results = await asyncio.gather(*closers, return_exceptions=True)
@@ -637,7 +642,7 @@ class ForgeEngine:
         if reasoning_effort not in {"low", "medium", "high", "xhigh"}:
             raise RequestContractError("reasoning_effort must be low, medium, high, or xhigh.")
         if trajectory_export and not self.trajectoryExporter.enabled:
-            raise RequestContractError("trajectoryExport requested but trajectory export is disabled server-side.")
+            raise RequestContractError("trajectoryExport is unavailable in this runtime.")
         if trajectory_export and topology == ExecutionTopology.INTERACTIVE:
             raise RequestContractError(
                 "trajectoryExport is not supported for interactive runs; exports require a complete prompt/response run."
@@ -851,6 +856,9 @@ class ForgeEngine:
                 finalText = self.outputPolicy(finalText, principal)
                 contentBlocks = self._applyOutputPolicy(contentBlocks, finalText)
             except SuspensionSignal as signal:
+                await self.toolExecutor.closeComputerSession(
+                    runId, tenant_id=principal.tenant_id, user_id=principal.user_id,
+                )
                 self._recordTerminal(
                     executionState,
                     "requires_action",
@@ -875,6 +883,9 @@ class ForgeEngine:
                 )
             except asyncio.CancelledError:
                 self._recordTerminal(executionState, "cancelled", "request_cancelled")
+                await self.toolExecutor.closeComputerSession(
+                    runId, tenant_id=principal.tenant_id, user_id=principal.user_id,
+                )
                 raise
             except Exception as exc:
                 self._recordTerminal(
@@ -883,7 +894,13 @@ class ForgeEngine:
                     type(exc).__name__,
                     errorType=type(exc).__name__,
                 )
+                await self.toolExecutor.closeComputerSession(
+                    runId, tenant_id=principal.tenant_id, user_id=principal.user_id,
+                )
                 raise
+            await self.toolExecutor.closeComputerSession(
+                runId, tenant_id=principal.tenant_id, user_id=principal.user_id,
+            )
             
             # Record assistant response
             sessionManager.addMessage("assistant", finalText)
@@ -1099,6 +1116,9 @@ class ForgeEngine:
             final_text = self.outputPolicy(final_text, principal)
             content_blocks = self._applyOutputPolicy(content_blocks, final_text)
         except SuspensionSignal as signal:
+            await self.toolExecutor.closeComputerSession(
+                run_id, tenant_id=principal.tenant_id, user_id=principal.user_id,
+            )
             self._recordTerminal(
                 state,
                 "requires_action",
@@ -1134,6 +1154,9 @@ class ForgeEngine:
             return response
         except asyncio.CancelledError:
             self._recordTerminal(state, "cancelled", "request_cancelled")
+            await self.toolExecutor.closeComputerSession(
+                run_id, tenant_id=principal.tenant_id, user_id=principal.user_id,
+            )
             raise
         except Exception as exc:
             self._recordTerminal(
@@ -1142,8 +1165,14 @@ class ForgeEngine:
                 type(exc).__name__,
                 errorType=type(exc).__name__,
             )
+            await self.toolExecutor.closeComputerSession(
+                run_id, tenant_id=principal.tenant_id, user_id=principal.user_id,
+            )
             raise
 
+        await self.toolExecutor.closeComputerSession(
+            run_id, tenant_id=principal.tenant_id, user_id=principal.user_id,
+        )
         response = OutputSynthesizer.synthesizeStatic(
             runId=run_id,
             content=content_blocks,
@@ -1243,6 +1272,12 @@ class ForgeEngine:
                 self._recordTerminal(state, "failed", type(exc).__name__, errorType=type(exc).__name__)
                 yield {"type": "status", "data": data}
             logger.exception("Streaming run failed", extra={"run_id": state.runId})
+        finally:
+            await self.toolExecutor.closeComputerSession(
+                state.runId,
+                tenant_id=state.getVariable("tenantId"),
+                user_id=state.getVariable("userId"),
+            )
 
     def _recordTerminal(
         self,
@@ -1360,6 +1395,7 @@ class ForgeEngine:
                 }, context={
                     "tenant_id": state.getVariable("tenantId"),
                     "user_id": state.getVariable("userId"),
+                    "run_id": state.runId,
                 })
             if isinstance(result, ToolResult):
                 result = result.toDict()
@@ -1481,7 +1517,7 @@ class ForgeEngine:
         if value.startswith(("https://", "http://")):
             inline = await self.mediaConverter.fromUrl(value)
         else:
-            from orchestrator.sandbox.pathPolicy import safePath
+            from orchestrator.computer.workspace import safePath
 
             inline = self.mediaConverter.fromFile(safePath(value, mode="read"))
         expected = "image/" if modality == "image" else "audio/" if modality == "audio" else None

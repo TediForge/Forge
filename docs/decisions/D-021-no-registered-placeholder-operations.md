@@ -1,5 +1,9 @@
 # D-021: No Registered Placeholder Operations
 
+> **Partially superseded by [D-026](./D-026-agent-computer-layer.md):**
+> command execution is now registered only through the isolated Firecracker
+> computer runtime; host-process shell execution remains prohibited.
+
 - **Status:** Accepted
 - **Date:** 2026-11-11
 - **Owner:** Orchestrator
@@ -24,8 +28,10 @@ Operations backed by optional providers remain implemented and return a
 specific configuration or provider error when that deployment dependency is
 unavailable. The handler must not fabricate a successful result.
 
-Unrestricted Python/Node/shell execution and interactive browser click/fill
-operations are not registered. Read-only browser automation is also omitted
+Unrestricted Python/Node/shell execution on the Orchestrator host and
+interactive browser click/fill operations are not registered. D-026 defines
+the only command-execution exception: commands run inside a disposable,
+network-isolated Firecracker microVM. Read-only browser automation is omitted
 until an approved browser runtime and navigation policy exist. Image content
 analysis/detection, video generation, and PDF table/image extraction are
 omitted until their providers are available.

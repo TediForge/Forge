@@ -12,7 +12,7 @@ def sandboxWorkspace(tmp_path, monkeypatch):
     for directoryName in ("uploads", "outputs", "tmp"):
         (workspaceRoot / directoryName).mkdir(parents=True, exist_ok=True)
     policy = json.loads(
-        (projectRoot / "src" / "orchestrator" / "sandbox" / "policy.json").read_text(encoding="utf-8")
+        (projectRoot / "src" / "orchestrator" / "computer" / "policy.json").read_text(encoding="utf-8")
     )
     (sandboxRoot / "policy.json").write_text(json.dumps(policy), encoding="utf-8")
     monkeypatch.setenv("FORGE_SANDBOX_ROOT", str(sandboxRoot))

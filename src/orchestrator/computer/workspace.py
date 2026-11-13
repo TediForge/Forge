@@ -1,4 +1,4 @@
-"""Policy-backed filesystem boundary shared by local tools."""
+"""Policy-backed workspace boundary shared by local tools."""
 
 import json
 import time

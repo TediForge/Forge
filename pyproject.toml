@@ -52,7 +52,7 @@ include = ["orchestrator*"]
 
 [tool.setuptools.package-data]
 "orchestrator.skills" = ["**/*.md"]
-"orchestrator.sandbox" = ["policy.json"]
+"orchestrator.computer" = ["policy.json"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]

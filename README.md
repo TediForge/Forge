@@ -36,6 +36,8 @@ model capabilities, artifact sources, and execution backends.
   Sentence-Transformers, faster-whisper, and Piper.
 - Registered local tools for document, data, image, video, and other supported
   operations.
+- A computer tool that runs bounded commands and manages workspace files in
+  disposable Firecracker microVMs on Linux/KVM deployments.
 - Structured Thought, Action, and Status events, including streaming responses.
 - Provider-backed token streaming for the local Transformers text runtime.
 - Caller-owned external tools that can suspend a run and resume with the
@@ -80,6 +82,16 @@ Forge orchestration engine
                           Save configured checkpoints/audit
 
 ```
+
+On Linux/KVM deployments, the `computer` tool routes command and workspace
+operations to disposable Firecracker guests. It does not execute commands in
+the Orchestrator process. Its warm pool scales on demand to a code-owned limit
+of 200 instances, further capped by detected host/cgroup memory; same-run
+operations are serialized and queued acquisition times out after 30 seconds.
+Snapshot-based cloning is not enabled because restoring one snapshot
+concurrently can duplicate guest identity and randomness. See the
+[computer runtime guide](docs/guides/computer-runtime.md) for guest image and
+service requirements.
 
 The registry binds model IDs and capabilities to a source and default backend.
 The gateway resolves artifacts and owns backend caching, execution limits,
@@ -213,6 +225,8 @@ are carried in `metadata`:
 
 - Python 3.11 or newer.
 - Network access on first use to download public model weights.
+- Linux with `/dev/kvm`, Firecracker, and a prepared guest image only if the
+  `computer` tool is enabled; see the [computer runtime guide](docs/guides/computer-runtime.md).
 - Sufficient disk space and memory for the selected local models. Diffusion
   and video models may require substantial resources.
 - FFmpeg and Tesseract for the corresponding media and OCR tools when running
@@ -236,48 +250,21 @@ On macOS or Linux, activate the environment with
 
 ## Configuration
 
-Copy `.env.example` to `.env` and adjust only the settings needed for your
-deployment:
+Copy [.env.example](.env.example) to `.env`. It lists deployment identity,
+persistent storage, model device, secrets, and optional deployment endpoints;
+code-owned defaults and safety limits are not environment variables.
 
-```env
-# Persistent checkpoint directory
-FORGE_CHECKPOINT_ROOT=data/checkpoints
-# Required when FORGE_ENVIRONMENT=production; mount on persistent storage.
-FORGE_ENVIRONMENT=development
-
-# Request size limits
-FORGE_MEDIA_MAX_BYTES=20971520
-# FORGE_MEDIA_ALLOWED_HOSTS=cdn.example.com,assets.example.org
-FORGE_ATTACHMENT_MAX_BYTES=10485760
-
-# Optional Hugging Face Hub token for private or gated model weights
-HF_TOKEN=
-
-# Trajectory export is disabled unless enabled here and requested per Responses call
-FORGE_TRAJECTORY_EXPORT_ENABLED=false
-FORGE_TRAJECTORY_EXPORT_DIR=logs/trajectories
-
-# Optional one-way upload of exported JSONL files
-FORGE_HF_SYNC_ENABLED=false
-FORGE_HF_TOKEN=
-FORGE_HF_REPO_ID=
-FORGE_HF_REPO_TYPE=dataset
-
-# Optional OpenTelemetry collector endpoint (HTTP/protobuf).
-# OTEL_EXPORTER_OTLP_ENDPOINT=http://localhost:4318/v1/traces
-```
-
-Treat Hub tokens as secrets. Trajectory export and Hub synchronization are
-disabled by default. Export is bounded, versioned JSONL with redaction, for
-evaluation and possible future preference tuning—not automatic model training.
-Do not enable it unless the data-handling requirements for the deployment
-explicitly allow it. See
+Treat Hub tokens as secrets. Trajectory export requires explicit
+`trajectoryExport=true` on a completed autonomous Responses request; it writes
+bounded, redacted JSONL to `logs/trajectories` by default. Hub upload is
+optional and is configured with `FORGE_HF_REPO_ID` and `HF_TOKEN`; the token
+must have permission to write to the destination repository. See
 [the trajectory export decision](docs/decisions/D-005-training-export-scope.md).
 
 No cloud inference API key is required by the current project configuration.
-The local model catalog downloads model weights from the Hugging Face Hub;
-optional Hub tokens are for gated/private downloads or the separately disabled
-upload feature, not hosted inference.
+The local model catalog downloads model weights from the Hugging Face Hub.
+`HF_TOKEN` is the optional Hub credential for private/gated downloads and,
+when configured, optional export uploads; it is not a hosted inference key.
 Set `FORGE_ENVIRONMENT=production` and an explicit
 `FORGE_CHECKPOINT_ROOT` for deployments; startup fails if the production
 checkpoint root is not configured. Checkpoint and audit storage should be on
@@ -357,7 +344,7 @@ dispatchers; consult the
 │       ├── engine/engine.py    ForgeEngine and graph execution
 │       ├── export/             Opt-in trajectory export
 │       ├── inference/          Registry, gateway, sources, backends, facades
-│       ├── sandbox/            File and execution boundaries
+│       ├── computer/           Firecracker guests and filesystem policies
 │       ├── security/           Identity, RBAC, audit, checkpoints
 │       ├── synthesis/          Response formatting and SSE
 │       └── tools/              Local tools and tool execution
